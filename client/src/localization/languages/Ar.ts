@@ -575,6 +575,7 @@ export default {
   com_nav_language: 'اللغة',
   com_nav_lang_auto: 'اكتشاف تلقائي',
   com_nav_lang_english: 'English',
+  com_nav_lang_persian: 'فارسی',
   com_nav_lang_chinese: '中文',
   com_nav_lang_german: 'Deutsch',
   com_nav_lang_spanish: 'Español',

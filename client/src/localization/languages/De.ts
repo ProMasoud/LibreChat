@@ -873,6 +873,7 @@ export default {
     'Diese Befehle werden aktiviert, indem du bestimmte Zeichen am Anfang deiner Nachricht eingibst. Jeder Befehl wird durch sein festgelegtes Präfix ausgelöst. Du kannst sie deaktivieren, wenn du diese Zeichen häufig zum Beginn deiner Nachrichten verwendest.',
   com_nav_lang_english: 'English',
   com_nav_lang_chinese: '中文',
+  com_nav_lang_persian: 'فارسی',
   com_nav_lang_german: 'Deutsch',
   com_nav_lang_spanish: 'Español',
   com_nav_lang_french: 'Français ',

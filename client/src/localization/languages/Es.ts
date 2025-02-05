@@ -603,6 +603,7 @@ export default {
   com_endpoint_openai_stop: 'Hasta 4 secuencias donde la API dejará de generar más tokens.',
   com_nav_lang_english: 'English',
   com_nav_lang_chinese: '中文',
+  com_nav_lang_persian: 'فارسی',
   com_nav_lang_german: 'Deutsch',
   com_nav_lang_spanish: 'Español',
   com_nav_lang_french: 'Français ',
