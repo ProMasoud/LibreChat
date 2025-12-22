@@ -1,35 +1,31 @@
 import { useEffect } from 'react';
-import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
 import { Constants, EModelEndpoint } from 'librechat-data-provider';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
 import type { TPreset } from 'librechat-data-provider';
-import { useGetConvoIdQuery, useGetStartupConfig, useGetEndpointsQuery } from '~/data-provider';
-import { useNewConvo, useAppStartup, useAssistantListMap, useIdChangeEffect } from '~/hooks';
-import { getDefaultModelSpec, getModelSpecPreset, logger } from '~/utils';
+import {
+  useGetConvoIdQuery,
+  useHealthCheck,
+  useGetEndpointsQuery,
+  useGetStartupConfig,
+} from '~/data-provider';
+import { useNewConvo, useAppStartup, useAssistantListMap } from '~/hooks';
+import { getDefaultModelSpec, getModelSpecIconURL } from '~/utils';
 import { ToolCallsMapProvider } from '~/Providers';
 import ChatView from '~/components/Chat/ChatView';
 import useAuthRedirect from './useAuthRedirect';
-import temporaryStore from '~/store/temporary';
-import { useRecoilCallback } from 'recoil';
+import { Spinner } from '~/components/svg';
 import store from '~/store';
 
 export default function ChatRoute() {
+  useHealthCheck();
   const { data: startupConfig } = useGetStartupConfig();
   const { isAuthenticated, user } = useAuthRedirect();
-
-  const setIsTemporary = useRecoilCallback(
-    ({ set }) =>
-      (value: boolean) => {
-        set(temporaryStore.isTemporary, value);
-      },
-    [],
-  );
   useAppStartup({ startupConfig, user });
 
   const index = 0;
   const { conversationId = '' } = useParams();
-  useIdChangeEffect(conversationId);
+
   const { hasSetConversation, conversation } = store.useCreateConversationAtom(index);
   const { newConversation } = useNewConvo();
 
@@ -38,25 +34,11 @@ export default function ChatRoute() {
     refetchOnMount: 'always',
   });
   const initialConvoQuery = useGetConvoIdQuery(conversationId, {
-    enabled:
-      isAuthenticated && conversationId !== Constants.NEW_CONVO && !hasSetConversation.current,
+    enabled: isAuthenticated && conversationId !== Constants.NEW_CONVO,
   });
   const endpointsQuery = useGetEndpointsQuery({ enabled: isAuthenticated });
   const assistantListMap = useAssistantListMap();
 
-  const isTemporaryChat = conversation && conversation.expiredAt ? true : false;
-
-  useEffect(() => {
-    if (conversationId !== Constants.NEW_CONVO && !isTemporaryChat) {
-      setIsTemporary(false);
-    } else if (isTemporaryChat) {
-      setIsTemporary(isTemporaryChat);
-    }
-  }, [conversationId, isTemporaryChat, setIsTemporary]);
-
-  /** This effect is mainly for the first conversation state change on first load of the page.
-   *  Adjusting this may have unintended consequences on the conversation state.
-   */
   useEffect(() => {
     const shouldSetConvo =
       (startupConfig && !hasSetConversation.current && !modelsQuery.data?.initial) ?? false;
@@ -66,18 +48,24 @@ export default function ChatRoute() {
     }
 
     if (conversationId === Constants.NEW_CONVO && endpointsQuery.data && modelsQuery.data) {
-      const result = getDefaultModelSpec(startupConfig);
-      const spec = result?.default ?? result?.last;
-      logger.log('conversation', 'ChatRoute, new convo effect', conversation);
+      const spec = getDefaultModelSpec(startupConfig?.modelSpecs?.list);
+
       newConversation({
         modelsData: modelsQuery.data,
         template: conversation ? conversation : undefined,
-        ...(spec ? { preset: getModelSpecPreset(spec) } : {}),
+        ...(spec
+          ? {
+            preset: {
+              ...spec.preset,
+              iconURL: getModelSpecIconURL(spec),
+              spec: spec.name,
+            },
+          }
+          : {}),
       });
 
       hasSetConversation.current = true;
     } else if (initialConvoQuery.data && endpointsQuery.data && modelsQuery.data) {
-      logger.log('conversation', 'ChatRoute initialConvoQuery', initialConvoQuery.data);
       newConversation({
         template: initialConvoQuery.data,
         /* this is necessary to load all existing settings */
@@ -91,20 +79,25 @@ export default function ChatRoute() {
       assistantListMap[EModelEndpoint.assistants] &&
       assistantListMap[EModelEndpoint.azureAssistants]
     ) {
-      const result = getDefaultModelSpec(startupConfig);
-      const spec = result?.default ?? result?.last;
-      logger.log('conversation', 'ChatRoute new convo, assistants effect', conversation);
+      const spec = getDefaultModelSpec(startupConfig?.modelSpecs?.list);
       newConversation({
         modelsData: modelsQuery.data,
         template: conversation ? conversation : undefined,
-        ...(spec ? { preset: getModelSpecPreset(spec) } : {}),
+        ...(spec
+          ? {
+            preset: {
+              ...spec.preset,
+              iconURL: getModelSpecIconURL(spec),
+              spec: spec.name,
+            },
+          }
+          : {}),
       });
       hasSetConversation.current = true;
     } else if (
       assistantListMap[EModelEndpoint.assistants] &&
       assistantListMap[EModelEndpoint.azureAssistants]
     ) {
-      logger.log('conversation', 'ChatRoute convo, assistants effect', initialConvoQuery.data);
       newConversation({
         template: initialConvoQuery.data,
         preset: initialConvoQuery.data as TPreset,
@@ -125,8 +118,8 @@ export default function ChatRoute() {
 
   if (endpointsQuery.isLoading || modelsQuery.isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center" aria-live="polite" role="status">
-        <Spinner className="text-text-primary" />
+      <div aria-live="polite" role="status">
+        <Spinner className="m-auto text-black dark:text-white" />
       </div>
     );
   }

@@ -1,7 +1,5 @@
-/* eslint-disable i18next/no-literal-string */
-import { Button } from '@librechat/client';
 import { useRouteError } from 'react-router-dom';
-import { useLocalize } from '~/hooks';
+import { Button } from '~/components/ui';
 import logger from '~/utils/logger';
 
 interface UserAgentData {
@@ -72,7 +70,6 @@ const getBrowserInfo = async () => {
 };
 
 export default function RouteErrorBoundary() {
-  const localize = useLocalize();
   const typedError = useRouteError() as {
     message?: string;
     stack?: string;
@@ -166,7 +163,6 @@ export default function RouteErrorBoundary() {
                   size="sm"
                   onClick={handleCopyStack}
                   className="ml-2 px-2 py-1 text-xs"
-                  aria-label={localize('com_ui_copy_stack_trace')}
                 >
                   Copy
                 </Button>
@@ -213,17 +209,11 @@ export default function RouteErrorBoundary() {
               variant="submit"
               onClick={() => window.location.reload()}
               className="w-full sm:w-auto"
-              aria-label={localize('com_ui_refresh_page')}
             >
-              {localize('com_ui_refresh_page')}
+              Refresh Page
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleDownloadLogs}
-              className="w-full sm:w-auto"
-              aria-label={localize('com_ui_download_error_logs')}
-            >
-              {localize('com_ui_download_error_logs')}
+            <Button variant="outline" onClick={handleDownloadLogs} className="w-full sm:w-auto">
+              Download Error Logs
             </Button>
           </div>
         </div>

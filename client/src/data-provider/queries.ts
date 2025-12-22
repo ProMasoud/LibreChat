@@ -2,25 +2,23 @@ import {
   QueryKeys,
   dataService,
   EModelEndpoint,
-  isAgentsEndpoint,
   defaultOrderQuery,
   defaultAssistantsVersion,
 } from 'librechat-data-provider';
+import { useRecoilValue } from 'recoil';
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   UseInfiniteQueryOptions,
   QueryObserverResult,
   UseQueryOptions,
-  InfiniteData,
 } from '@tanstack/react-query';
 import type t from 'librechat-data-provider';
 import type {
   Action,
   TPreset,
+  TPlugin,
   ConversationListResponse,
   ConversationListParams,
-  MessagesListParams,
-  MessagesListResponse,
   Assistant,
   AssistantListParams,
   AssistantListResponse,
@@ -30,14 +28,13 @@ import type {
   SharedLinksListParams,
   SharedLinksResponse,
 } from 'librechat-data-provider';
-import type { ConversationCursorData } from '~/utils/convos';
-import { findConversationInInfinite } from '~/utils';
+import { findPageForConversation } from '~/utils';
+import store from '~/store';
 
 export const useGetPresetsQuery = (
   config?: UseQueryOptions<TPreset[]>,
 ): QueryObserverResult<TPreset[], unknown> => {
   return useQuery<TPreset[]>([QueryKeys.presets], () => dataService.getPresets(), {
-    staleTime: 1000 * 10,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
@@ -45,27 +42,45 @@ export const useGetPresetsQuery = (
   });
 };
 
+export const useGetEndpointsConfigOverride = <TData = unknown | boolean>(
+  config?: UseQueryOptions<unknown | boolean, unknown, TData>,
+): QueryObserverResult<TData> => {
+  return useQuery<unknown | boolean, unknown, TData>(
+    [QueryKeys.endpointsConfigOverride],
+    () => dataService.getEndpointsConfigOverride(),
+    {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      ...config,
+    },
+  );
+};
+
 export const useGetConvoIdQuery = (
   id: string,
   config?: UseQueryOptions<t.TConversation>,
 ): QueryObserverResult<t.TConversation> => {
   const queryClient = useQueryClient();
-
   return useQuery<t.TConversation>(
     [QueryKeys.conversation, id],
     () => {
-      // Try to find in all fetched infinite pages
-      const convosQuery = queryClient.getQueryData<InfiniteData<ConversationCursorData>>(
-        [QueryKeys.allConversations],
-        { exact: false },
-      );
-      const found = findConversationInInfinite(convosQuery, id);
+      const defaultQuery = () => dataService.getConversationById(id);
+      const convosQuery = queryClient.getQueryData<t.ConversationData>([
+        QueryKeys.allConversations,
+      ]);
 
-      if (found && found.messages != null) {
-        return found;
+      if (!convosQuery) {
+        return defaultQuery();
       }
-      // Otherwise, fetch from API
-      return dataService.getConversationById(id);
+
+      const { pageIndex, index } = findPageForConversation(convosQuery, { conversationId: id });
+
+      if (pageIndex > -1 && index > -1) {
+        return convosQuery.pages[pageIndex].conversations[index];
+      }
+
+      return defaultQuery();
     },
     {
       refetchOnWindowFocus: false,
@@ -76,61 +91,56 @@ export const useGetConvoIdQuery = (
   );
 };
 
-export const useConversationsInfiniteQuery = (
-  params: ConversationListParams,
+export const useSearchInfiniteQuery = (
+  params?: ConversationListParams & { searchQuery?: string },
   config?: UseInfiniteQueryOptions<ConversationListResponse, unknown>,
 ) => {
-  const { isArchived, sortBy, sortDirection, tags, search } = params;
-
-  return useInfiniteQuery<ConversationListResponse>({
-    queryKey: [
-      isArchived ? QueryKeys.archivedConversations : QueryKeys.allConversations,
-      { isArchived, sortBy, sortDirection, tags, search },
-    ],
-    queryFn: ({ pageParam }) =>
-      dataService.listConversations({
-        isArchived,
-        sortBy,
-        sortDirection,
-        tags,
-        search,
-        cursor: pageParam?.toString(),
-      }),
-    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
-    keepPreviousData: true,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    ...config,
-  });
+  return useInfiniteQuery<ConversationListResponse, unknown>(
+    [QueryKeys.searchConversations, params], // Include the searchQuery in the query key
+    ({ pageParam = '1' }) =>
+      dataService.listConversationsByQuery({ ...params, pageNumber: pageParam }),
+    {
+      getNextPageParam: (lastPage) => {
+        const currentPageNumber = Number(lastPage.pageNumber);
+        const totalPages = Number(lastPage.pages);
+        return currentPageNumber < totalPages ? currentPageNumber + 1 : undefined;
+      },
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      ...config,
+    },
+  );
 };
 
-export const useMessagesInfiniteQuery = (
-  params: MessagesListParams,
-  config?: UseInfiniteQueryOptions<MessagesListResponse, unknown>,
+export const useConversationsInfiniteQuery = (
+  params?: ConversationListParams,
+  config?: UseInfiniteQueryOptions<ConversationListResponse, unknown>,
 ) => {
-  const { sortBy, sortDirection, pageSize, conversationId, messageId, search } = params;
-
-  return useInfiniteQuery<MessagesListResponse>({
-    queryKey: [
-      QueryKeys.messages,
-      { sortBy, sortDirection, pageSize, conversationId, messageId, search },
-    ],
-    queryFn: ({ pageParam }) =>
-      dataService.listMessages({
-        sortBy,
-        sortDirection,
-        pageSize,
-        conversationId,
-        messageId,
-        search,
-        cursor: pageParam?.toString(),
+  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  return useInfiniteQuery<ConversationListResponse, unknown>(
+    params?.isArchived === true ? [QueryKeys.archivedConversations] : [QueryKeys.allConversations],
+    ({ pageParam = '' }) =>
+      dataService.listConversations({
+        ...params,
+        pageNumber: pageParam?.toString(),
+        isArchived: params?.isArchived ?? false,
+        tags: params?.tags || [],
       }),
-    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
-    keepPreviousData: true,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 30 * 60 * 1000, // 30 minutes
-    ...config,
-  });
+    {
+      getNextPageParam: (lastPage) => {
+        const currentPageNumber = Number(lastPage.pageNumber);
+        const totalPages = Number(lastPage.pages); // Convert totalPages to a number
+        // If the current page number is less than total pages, return the next page number
+        return currentPageNumber < totalPages ? currentPageNumber + 1 : undefined;
+      },
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      ...config,
+      enabled: (config?.enabled ?? true) === true && queriesEnabled,
+    },
+  );
 };
 
 export const useSharedLinksQuery = (
@@ -150,7 +160,7 @@ export const useSharedLinksQuery = (
         sortBy,
         sortDirection,
       }),
-    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     keepPreviousData: true,
     staleTime: 5 * 60 * 1000, // 5 minutes
     cacheTime: 30 * 60 * 1000, // 30 minutes
@@ -178,22 +188,20 @@ export const useConversationTagsQuery = (
  */
 
 /**
- * Hook for getting available LibreChat tools (excludes MCP tools)
- * For MCP tools, use `useMCPToolsQuery` from mcp-queries.ts
+ * Hook for getting all available tools for Assistants
  */
-export const useAvailableToolsQuery = <TData = t.TPlugin[]>(
+export const useAvailableToolsQuery = (
   endpoint: t.AssistantsEndpoint | EModelEndpoint.agents,
-  config?: UseQueryOptions<t.TPlugin[], unknown, TData>,
-): QueryObserverResult<TData> => {
+): QueryObserverResult<TPlugin[]> => {
   const queryClient = useQueryClient();
   const endpointsConfig = queryClient.getQueryData<TEndpointsConfig>([QueryKeys.endpoints]);
   const keyExpiry = queryClient.getQueryData<TCheckUserKeyResponse>([QueryKeys.name, endpoint]);
   const userProvidesKey = !!endpointsConfig?.[endpoint]?.userProvide;
   const keyProvided = userProvidesKey ? !!keyExpiry?.expiresAt : true;
-  const enabled = isAgentsEndpoint(endpoint) ? true : !!endpointsConfig?.[endpoint] && keyProvided;
+  const enabled = !!endpointsConfig?.[endpoint] && keyProvided;
   const version: string | number | undefined =
     endpointsConfig?.[endpoint]?.version ?? defaultAssistantsVersion[endpoint];
-  return useQuery<t.TPlugin[], unknown, TData>(
+  return useQuery<TPlugin[]>(
     [QueryKeys.tools],
     () => dataService.getAvailableTools(endpoint, version),
     {
@@ -201,7 +209,6 @@ export const useAvailableToolsQuery = <TData = t.TPlugin[]>(
       refetchOnReconnect: false,
       refetchOnMount: false,
       enabled,
-      ...config,
     },
   );
 };
@@ -229,7 +236,6 @@ export const useListAssistantsQuery = <TData = AssistantListResponse>(
       // select: (res) => {
       //   return res.data.sort((a, b) => a.created_at - b.created_at);
       // },
-      staleTime: 1000 * 5,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       refetchOnMount: false,
@@ -401,27 +407,22 @@ export const usePromptGroupsInfiniteQuery = (
   params?: t.TPromptGroupsWithFilterRequest,
   config?: UseInfiniteQueryOptions<t.PromptGroupListResponse, unknown>,
 ) => {
-  const { name, pageSize, category } = params || {};
+  const { name, pageSize, category, ...rest } = params || {};
   return useInfiniteQuery<t.PromptGroupListResponse, unknown>(
     [QueryKeys.promptGroups, name, category, pageSize],
-    ({ pageParam }) => {
-      const queryParams: t.TPromptGroupsWithFilterRequest = {
+    ({ pageParam = '1' }) =>
+      dataService.getPromptGroups({
+        ...rest,
         name,
         category: category || '',
-        limit: (pageSize || 10).toString(),
-      };
-
-      // Only add cursor if it's a valid string
-      if (pageParam && typeof pageParam === 'string') {
-        queryParams.cursor = pageParam;
-      }
-
-      return dataService.getPromptGroups(queryParams);
-    },
+        pageNumber: pageParam?.toString(),
+        pageSize: (pageSize || 10).toString(),
+      }),
     {
       getNextPageParam: (lastPage) => {
-        // Use cursor-based pagination - ensure we return a valid cursor or undefined
-        return lastPage.has_more && lastPage.after ? lastPage.after : undefined;
+        const currentPageNumber = Number(lastPage.pageNumber);
+        const totalPages = Number(lastPage.pages);
+        return currentPageNumber < totalPages ? currentPageNumber + 1 : undefined;
       },
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,

@@ -1,12 +1,12 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
-import copy from 'copy-to-clipboard';
 import rehypeKatex from 'rehype-katex';
 import ReactMarkdown from 'react-markdown';
-import { Button } from '@librechat/client';
 import rehypeHighlight from 'rehype-highlight';
-import { Copy, CircleCheckBig } from 'lucide-react';
+import copy from 'copy-to-clipboard';
 import { handleDoubleClick, langSubset } from '~/utils';
-import { useLocalize } from '~/hooks';
+import Clipboard from '~/components/svg/Clipboard';
+import CheckMark from '~/components/svg/CheckMark';
+import useLocalize from '~/hooks/useLocalize';
 
 type TCodeProps = {
   inline: boolean;
@@ -35,7 +35,7 @@ export const CodeMarkdown = memo(
     const [userScrolled, setUserScrolled] = useState(false);
     const currentContent = content;
     const rehypePlugins = [
-      [rehypeKatex],
+      [rehypeKatex, { output: 'mathml' }],
       [
         rehypeHighlight,
         {
@@ -108,13 +108,12 @@ export const CopyCodeButton: React.FC<{ content: string }> = ({ content }) => {
   };
 
   return (
-    <Button
-      size="icon"
-      variant="ghost"
+    <button
+      className="mr-2 text-text-secondary"
       onClick={handleCopy}
       aria-label={isCopied ? localize('com_ui_copied') : localize('com_ui_copy_code')}
     >
-      {isCopied ? <CircleCheckBig size={16} /> : <Copy size={16} />}
-    </Button>
+      {isCopied ? <CheckMark className="h-[18px] w-[18px]" /> : <Clipboard />}
+    </button>
   );
 };

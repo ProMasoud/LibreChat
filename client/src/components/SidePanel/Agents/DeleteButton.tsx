@@ -1,20 +1,12 @@
-import { useFormContext } from 'react-hook-form';
-import {
-  Label,
-  Button,
-  OGDialog,
-  TrashIcon,
-  useToastContext,
-  OGDialogTrigger,
-  OGDialogTemplate,
-} from '@librechat/client';
 import type { Agent, AgentCreateParams } from 'librechat-data-provider';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { logger, getDefaultAgentFormValues } from '~/utils';
+import { OGDialog, OGDialogTrigger, Label } from '~/components/ui';
+import { useChatContext, useToastContext } from '~/Providers';
+import OGDialogTemplate from '~/components/ui/OGDialogTemplate';
 import { useLocalize, useSetIndexOptions } from '~/hooks';
+import { cn, removeFocusOutlines, logger } from '~/utils';
 import { useDeleteAgentMutation } from '~/data-provider';
-import { useChatContext } from '~/Providers';
-import { isEphemeralAgent } from '~/common';
+import { TrashIcon } from '~/components/svg';
 
 export default function DeleteButton({
   agent_id,
@@ -26,7 +18,6 @@ export default function DeleteButton({
   createMutation: UseMutationResult<Agent, Error, AgentCreateParams>;
 }) {
   const localize = useLocalize();
-  const { reset } = useFormContext();
   const { showToast } = useToastContext();
   const { conversation } = useChatContext();
   const { setOption } = useSetIndexOptions();
@@ -50,8 +41,6 @@ export default function DeleteButton({
 
       const firstAgent = updatedList[0] as Agent | undefined;
       if (!firstAgent) {
-        setCurrentAgentId(undefined);
-        reset(getDefaultAgentFormValues());
         return setOption('agent_id')('');
       }
 
@@ -77,23 +66,25 @@ export default function DeleteButton({
     },
   });
 
-  if (isEphemeralAgent(agent_id)) {
+  if (!agent_id) {
     return null;
   }
 
   return (
     <OGDialog>
       <OGDialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="outline"
+        <button
+          className={cn(
+            'btn btn-neutral border-token-border-light relative h-9 rounded-lg font-medium',
+            removeFocusOutlines,
+          )}
           aria-label={localize('com_ui_delete') + ' ' + localize('com_ui_agent')}
           type="button"
         >
           <div className="flex w-full items-center justify-center gap-2 text-red-500">
             <TrashIcon />
           </div>
-        </Button>
+        </button>
       </OGDialogTrigger>
       <OGDialogTemplate
         title={localize('com_ui_delete') + ' ' + localize('com_ui_agent')}

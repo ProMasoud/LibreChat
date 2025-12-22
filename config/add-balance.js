@@ -1,11 +1,9 @@
 const path = require('path');
-const mongoose = require('mongoose');
-const { getBalanceConfig } = require('@librechat/api');
-const { User } = require('@librechat/data-schemas').createModels(mongoose);
 require('module-alias')({ base: path.resolve(__dirname, '..', 'api') });
-const { createTransaction } = require('~/models/Transaction');
-const { getAppConfig } = require('~/server/services/Config');
 const { askQuestion, silentExit } = require('./helpers');
+const { isEnabled } = require('~/server/utils/handleText');
+const { Transaction } = require('~/models/Transaction');
+const User = require('~/models/User');
 const connect = require('./connect');
 
 (async () => {
@@ -33,12 +31,15 @@ const connect = require('./connect');
     // console.purple(`[DEBUG] Args Length: ${process.argv.length}`);
   }
 
-  const appConfig = await getAppConfig();
-  const balanceConfig = getBalanceConfig(appConfig);
-
-  if (!balanceConfig?.enabled) {
+  if (!process.env.CHECK_BALANCE) {
     console.red(
-      'Error: Balance is not enabled. Use librechat.yaml to enable it',
+      'Error: CHECK_BALANCE environment variable is not set! Configure it to use it: `CHECK_BALANCE=true`',
+    );
+    silentExit(1);
+  }
+  if (isEnabled(process.env.CHECK_BALANCE) === false) {
+    console.red(
+      'Error: CHECK_BALANCE environment variable is set to `false`! Please configure: `CHECK_BALANCE=true`',
     );
     silentExit(1);
   }
@@ -77,12 +78,11 @@ const connect = require('./connect');
    */
   let result;
   try {
-    result = await createTransaction({
+    result = await Transaction.create({
       user: user._id,
       tokenType: 'credits',
       context: 'admin',
       rawAmount: +amount,
-      balance: balanceConfig,
     });
   } catch (error) {
     console.red('Error: ' + error.message);

@@ -1,11 +1,13 @@
 jest.mock('~/cache/getLogStores');
 require('dotenv').config();
-const { fetchEventSource } = require('@waylaidwanderer/fetch-event-source');
+const OpenAI = require('openai');
 const getLogStores = require('~/cache/getLogStores');
+const { fetchEventSource } = require('@waylaidwanderer/fetch-event-source');
+const { genAzureChatCompletion } = require('~/utils/azureUtils');
 const OpenAIClient = require('../OpenAIClient');
 jest.mock('meilisearch');
 
-jest.mock('~/db/connect');
+jest.mock('~/lib/db/connectDb');
 jest.mock('~/models', () => ({
   User: jest.fn(),
   Key: jest.fn(),
@@ -34,21 +36,19 @@ jest.mock('~/models', () => ({
   updateFileUsage: jest.fn(),
 }));
 
-// Import the actual module but mock specific parts
-const agents = jest.requireActual('@librechat/agents');
-const { CustomOpenAIClient } = agents;
-
-// Also mock ChatOpenAI to prevent real API calls
-agents.ChatOpenAI = jest.fn().mockImplementation(() => {
-  return {};
-});
-agents.AzureChatOpenAI = jest.fn().mockImplementation(() => {
-  return {};
+jest.mock('@langchain/openai', () => {
+  return {
+    ChatOpenAI: jest.fn().mockImplementation(() => {
+      return {};
+    }),
+  };
 });
 
-// Mock only the CustomOpenAIClient constructor
-jest.spyOn(CustomOpenAIClient, 'constructor').mockImplementation(function (...options) {
-  return new CustomOpenAIClient(...options);
+jest.mock('openai');
+
+jest.spyOn(OpenAI, 'constructor').mockImplementation(function (...options) {
+  // We can add additional logic here if needed
+  return new OpenAI(...options);
 });
 
 const finalChatCompletion = jest.fn().mockResolvedValue({
@@ -120,13 +120,7 @@ const create = jest.fn().mockResolvedValue({
   ],
 });
 
-// Mock the implementation of CustomOpenAIClient instances
-jest.spyOn(CustomOpenAIClient.prototype, 'constructor').mockImplementation(function () {
-  return this;
-});
-
-// Create a mock for the CustomOpenAIClient class
-const mockCustomOpenAIClient = jest.fn().mockImplementation(() => ({
+OpenAI.mockImplementation(() => ({
   beta: {
     chat: {
       completions: {
@@ -141,14 +135,11 @@ const mockCustomOpenAIClient = jest.fn().mockImplementation(() => ({
   },
 }));
 
-CustomOpenAIClient.mockImplementation = mockCustomOpenAIClient;
-
 describe('OpenAIClient', () => {
+  const mockSet = jest.fn();
+  const mockCache = { set: mockSet };
+
   beforeEach(() => {
-    const mockCache = {
-      get: jest.fn().mockResolvedValue({}),
-      set: jest.fn(),
-    };
     getLogStores.mockReturnValue(mockCache);
   });
   let client;
@@ -209,6 +200,14 @@ describe('OpenAIClient', () => {
       expect(client.apiKey).toBe('new-api-key');
       expect(client.modelOptions.model).toBe(model);
       expect(client.modelOptions.temperature).toBe(0.7);
+    });
+
+    it('should set apiKey and useOpenRouter if OPENROUTER_API_KEY is present', () => {
+      process.env.OPENROUTER_API_KEY = 'openrouter-key';
+      client.setOptions({});
+      expect(client.apiKey).toBe('openrouter-key');
+      expect(client.useOpenRouter).toBe(true);
+      delete process.env.OPENROUTER_API_KEY; // Cleanup
     });
 
     it('should set FORCE_PROMPT based on OPENAI_FORCE_PROMPT or reverseProxyUrl', () => {
@@ -462,17 +461,17 @@ describe('OpenAIClient', () => {
         role: 'system',
         name: 'example_user',
         content:
-          "Let's circle back when we have more bandwidth to touch base on opportunities for increased leverage.",
+          'Let\'s circle back when we have more bandwidth to touch base on opportunities for increased leverage.',
       },
       {
         role: 'system',
         name: 'example_assistant',
-        content: "Let's talk later when we're less busy about how to do better.",
+        content: 'Let\'s talk later when we\'re less busy about how to do better.',
       },
       {
         role: 'user',
         content:
-          "This late pivot means we don't have time to boil the ocean for the client deliverable.",
+          'This late pivot means we don\'t have time to boil the ocean for the client deliverable.',
       },
     ];
 
@@ -528,6 +527,80 @@ describe('OpenAIClient', () => {
         totalTokens += client.getTokenCountForMessage(message);
       }
       expect(totalTokens).toBe(expectedTokens);
+    });
+  });
+
+  describe('sendMessage/getCompletion/chatCompletion', () => {
+    afterEach(() => {
+      delete process.env.AZURE_OPENAI_DEFAULT_MODEL;
+      delete process.env.AZURE_USE_MODEL_AS_DEPLOYMENT_NAME;
+      delete process.env.OPENROUTER_API_KEY;
+    });
+
+    it('should call getCompletion and fetchEventSource when using a text/instruct model', async () => {
+      const model = 'text-davinci-003';
+      const onProgress = jest.fn().mockImplementation(() => ({}));
+
+      const testClient = new OpenAIClient('test-api-key', {
+        ...defaultOptions,
+        modelOptions: { model },
+      });
+
+      const getCompletion = jest.spyOn(testClient, 'getCompletion');
+      await testClient.sendMessage('Hi mom!', { onProgress });
+
+      expect(getCompletion).toHaveBeenCalled();
+      expect(getCompletion.mock.calls.length).toBe(1);
+
+      expect(getCompletion.mock.calls[0][0]).toBe('||>User:\nHi mom!\n||>Assistant:\n');
+
+      expect(fetchEventSource).toHaveBeenCalled();
+      expect(fetchEventSource.mock.calls.length).toBe(1);
+
+      // Check if the first argument (url) is correct
+      const firstCallArgs = fetchEventSource.mock.calls[0];
+
+      const expectedURL = 'https://api.openai.com/v1/completions';
+      expect(firstCallArgs[0]).toBe(expectedURL);
+
+      const requestBody = JSON.parse(firstCallArgs[1].body);
+      expect(requestBody).toHaveProperty('model');
+      expect(requestBody.model).toBe(model);
+    });
+
+    it('[Azure OpenAI] should call chatCompletion and OpenAI.stream with correct args', async () => {
+      // Set a default model
+      process.env.AZURE_OPENAI_DEFAULT_MODEL = 'gpt4-turbo';
+
+      const onProgress = jest.fn().mockImplementation(() => ({}));
+      client.azure = defaultAzureOptions;
+      const chatCompletion = jest.spyOn(client, 'chatCompletion');
+      await client.sendMessage('Hi mom!', {
+        replaceOptions: true,
+        ...defaultOptions,
+        modelOptions: { model: 'gpt4-turbo', stream: true },
+        onProgress,
+        azure: defaultAzureOptions,
+      });
+
+      expect(chatCompletion).toHaveBeenCalled();
+      expect(chatCompletion.mock.calls.length).toBe(1);
+
+      const chatCompletionArgs = chatCompletion.mock.calls[0][0];
+      const { payload } = chatCompletionArgs;
+
+      expect(payload[0].role).toBe('user');
+      expect(payload[0].content).toBe('Hi mom!');
+
+      // Azure OpenAI does not use the model property, and will error if it's passed
+      // This check ensures the model property is not present
+      const streamArgs = stream.mock.calls[0][0];
+      expect(streamArgs).not.toHaveProperty('model');
+
+      // Check if the baseURL is correct
+      const constructorArgs = OpenAI.mock.calls[0][0];
+      const expectedURL = genAzureChatCompletion(defaultAzureOptions).split('/chat')[0];
+      expect(constructorArgs.baseURL).toBe(expectedURL);
     });
   });
 

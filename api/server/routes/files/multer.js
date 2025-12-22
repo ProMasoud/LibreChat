@@ -2,18 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
-const { sanitizeFilename } = require('@librechat/api');
-const {
-  mergeFileConfig,
-  getEndpointFileConfig,
-  fileConfig: defaultFileConfig,
-} = require('librechat-data-provider');
-const { getAppConfig } = require('~/server/services/Config');
+const { fileConfig: defaultFileConfig, mergeFileConfig } = require('librechat-data-provider');
+const { sanitizeFilename } = require('~/server/utils/handleText');
+const { getCustomConfig } = require('~/server/services/Config');
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const appConfig = req.config;
-    const outputPath = path.join(appConfig.paths.uploads, 'temp', req.user.id);
+    const outputPath = path.join(req.app.locals.paths.uploads, 'temp', req.user.id);
     if (!fs.existsSync(outputPath)) {
       fs.mkdirSync(outputPath, { recursive: true });
     }
@@ -57,14 +52,12 @@ const createFileFilter = (customFileConfig) => {
     }
 
     const endpoint = req.body.endpoint;
-    const endpointType = req.body.endpointType;
-    const endpointFileConfig = getEndpointFileConfig({
-      fileConfig: customFileConfig,
-      endpoint,
-      endpointType,
-    });
+    const supportedTypes =
+      customFileConfig?.endpoints?.[endpoint]?.supportedMimeTypes ??
+      customFileConfig?.endpoints?.default.supportedMimeTypes ??
+      defaultFileConfig?.endpoints?.[endpoint]?.supportedMimeTypes;
 
-    if (!defaultFileConfig.checkType(file.mimetype, endpointFileConfig.supportedMimeTypes)) {
+    if (!defaultFileConfig.checkType(file.mimetype, supportedTypes)) {
       return cb(new Error('Unsupported file type: ' + file.mimetype), false);
     }
 
@@ -75,8 +68,8 @@ const createFileFilter = (customFileConfig) => {
 };
 
 const createMulterInstance = async () => {
-  const appConfig = await getAppConfig();
-  const fileConfig = mergeFileConfig(appConfig?.fileConfig);
+  const customConfig = await getCustomConfig();
+  const fileConfig = mergeFileConfig(customConfig?.fileConfig);
   const fileFilter = createFileFilter(fileConfig);
   return multer({
     storage,

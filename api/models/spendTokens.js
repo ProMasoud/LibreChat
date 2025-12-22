@@ -1,11 +1,18 @@
-const { logger } = require('@librechat/data-schemas');
-const { createTransaction, createStructuredTransaction } = require('./Transaction');
+const { Transaction } = require('./Transaction');
+const { logger } = require('~/config');
+
 /**
  * Creates up to two transactions to record the spending of tokens.
  *
  * @function
  * @async
- * @param {txData} txData - Transaction data.
+ * @param {Object} txData - Transaction data.
+ * @param {mongoose.Schema.Types.ObjectId} txData.user - The user ID.
+ * @param {String} txData.conversationId - The ID of the conversation.
+ * @param {String} txData.model - The model name.
+ * @param {String} txData.context - The context in which the transaction is made.
+ * @param {EndpointTokenConfig} [txData.endpointTokenConfig] - The current endpoint token config.
+ * @param {String} [txData.valueKey] - The value key (optional).
  * @param {Object} tokenUsage - The number of tokens used.
  * @param {Number} tokenUsage.promptTokens - The number of prompt tokens used.
  * @param {Number} tokenUsage.completionTokens - The number of completion tokens used.
@@ -26,18 +33,18 @@ const spendTokens = async (txData, tokenUsage) => {
   let prompt, completion;
   try {
     if (promptTokens !== undefined) {
-      prompt = await createTransaction({
+      prompt = await Transaction.create({
         ...txData,
         tokenType: 'prompt',
-        rawAmount: promptTokens === 0 ? 0 : -Math.max(promptTokens, 0),
+        rawAmount: -Math.max(promptTokens, 0),
       });
     }
 
     if (completionTokens !== undefined) {
-      completion = await createTransaction({
+      completion = await Transaction.create({
         ...txData,
         tokenType: 'completion',
-        rawAmount: completionTokens === 0 ? 0 : -Math.max(completionTokens, 0),
+        rawAmount: -Math.max(completionTokens, 0),
       });
     }
 
@@ -63,7 +70,13 @@ const spendTokens = async (txData, tokenUsage) => {
  *
  * @function
  * @async
- * @param {txData} txData - Transaction data.
+ * @param {Object} txData - Transaction data.
+ * @param {mongoose.Schema.Types.ObjectId} txData.user - The user ID.
+ * @param {String} txData.conversationId - The ID of the conversation.
+ * @param {String} txData.model - The model name.
+ * @param {String} txData.context - The context in which the transaction is made.
+ * @param {EndpointTokenConfig} [txData.endpointTokenConfig] - The current endpoint token config.
+ * @param {String} [txData.valueKey] - The value key (optional).
  * @param {Object} tokenUsage - The number of tokens used.
  * @param {Object} tokenUsage.promptTokens - The number of prompt tokens used.
  * @param {Number} tokenUsage.promptTokens.input - The number of input tokens.
@@ -88,7 +101,7 @@ const spendStructuredTokens = async (txData, tokenUsage) => {
   try {
     if (promptTokens) {
       const { input = 0, write = 0, read = 0 } = promptTokens;
-      prompt = await createStructuredTransaction({
+      prompt = await Transaction.createStructured({
         ...txData,
         tokenType: 'prompt',
         inputTokens: -input,
@@ -98,7 +111,7 @@ const spendStructuredTokens = async (txData, tokenUsage) => {
     }
 
     if (completionTokens) {
-      completion = await createTransaction({
+      completion = await Transaction.create({
         ...txData,
         tokenType: 'completion',
         rawAmount: -completionTokens,

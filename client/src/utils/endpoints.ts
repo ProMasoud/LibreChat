@@ -1,10 +1,8 @@
 import {
-  Constants,
   EModelEndpoint,
   defaultEndpoints,
   modularEndpoints,
   LocalStorageKeys,
-  getEndpointField,
   isAgentsEndpoint,
   isAssistantsEndpoint,
 } from 'librechat-data-provider';
@@ -58,6 +56,24 @@ export const getAvailableEndpoints = (
 
   return availableEndpoints;
 };
+
+/** Get the specified field from the endpoint config */
+export function getEndpointField<K extends keyof t.TConfig>(
+  endpointsConfig: t.TEndpointsConfig | undefined,
+  endpoint: EModelEndpoint | string | null | undefined,
+  property: K,
+): t.TConfig[K] | undefined {
+  if (!endpointsConfig || endpoint === null || endpoint === undefined) {
+    return undefined;
+  }
+
+  const config = endpointsConfig[endpoint];
+  if (!config) {
+    return undefined;
+  }
+
+  return config[property];
+}
 
 export function mapEndpoints(endpointsConfig: t.TEndpointsConfig) {
   const filter = getEndpointsFilter(endpointsConfig);
@@ -160,81 +176,15 @@ export function getConvoSwitchLogic(params: ConversationInitParams): InitiatedTe
   };
 }
 
-export function getModelSpec({
-  specName,
-  startupConfig,
-}: {
-  specName?: string | null;
-  startupConfig?: t.TStartupConfig;
-}): t.TModelSpec | undefined {
-  if (!startupConfig || !specName) {
-    return;
-  }
-  return startupConfig.modelSpecs?.list?.find((spec) => spec.name === specName);
-}
-
-export function applyModelSpecEphemeralAgent({
-  convoId,
-  modelSpec,
-  updateEphemeralAgent,
-}: {
-  convoId?: string | null;
-  modelSpec?: t.TModelSpec;
-  updateEphemeralAgent: ((convoId: string, agent: t.TEphemeralAgent | null) => void) | undefined;
-}) {
-  if (!modelSpec || !updateEphemeralAgent) {
-    return;
-  }
-  updateEphemeralAgent((convoId ?? Constants.NEW_CONVO) || Constants.NEW_CONVO, {
-    mcp: modelSpec.mcpServers ?? [Constants.mcp_clear as string],
-    web_search: modelSpec.webSearch ?? false,
-    file_search: modelSpec.fileSearch ?? false,
-    execute_code: modelSpec.executeCode ?? false,
-  });
-}
-
-/**
- * Gets default model spec from config and user preferences.
- * Priority: admin default → last selected → first spec (when prioritize=true or modelSelect disabled).
- * Otherwise: admin default or last conversation spec.
+/** Gets the default spec by order.
+ *
+ * First, the admin defined default, then last selected spec, followed by first spec
  */
-export function getDefaultModelSpec(startupConfig?: t.TStartupConfig):
-  | {
-      default?: t.TModelSpec;
-      last?: t.TModelSpec;
-    }
-  | undefined {
-  const { modelSpecs, interface: interfaceConfig } = startupConfig ?? {};
-  const { list, prioritize } = modelSpecs ?? {};
-  if (!list) {
-    return;
-  }
-  const defaultSpec = list?.find((spec) => spec.default);
-  if (prioritize === true || !interfaceConfig?.modelSelect) {
-    const lastSelectedSpecName = localStorage.getItem(LocalStorageKeys.LAST_SPEC);
-    const lastSelectedSpec = list?.find((spec) => spec.name === lastSelectedSpecName);
-    return { default: defaultSpec || lastSelectedSpec || list?.[0] };
-  } else if (defaultSpec) {
-    return { default: defaultSpec };
-  }
-  const lastConversationSetup = JSON.parse(
-    localStorage.getItem(LocalStorageKeys.LAST_CONVO_SETUP + '_0') ?? '{}',
-  );
-  if (!lastConversationSetup.spec) {
-    return;
-  }
-  return { last: list?.find((spec) => spec.name === lastConversationSetup.spec) };
-}
-
-export function getModelSpecPreset(modelSpec?: t.TModelSpec) {
-  if (!modelSpec) {
-    return;
-  }
-  return {
-    ...modelSpec.preset,
-    spec: modelSpec.name,
-    iconURL: getModelSpecIconURL(modelSpec),
-  };
+export function getDefaultModelSpec(modelSpecs?: t.TModelSpec[]) {
+  const defaultSpec = modelSpecs?.find((spec) => spec.default);
+  const lastSelectedSpecName = localStorage.getItem(LocalStorageKeys.LAST_SPEC);
+  const lastSelectedSpec = modelSpecs?.find((spec) => spec.name === lastSelectedSpecName);
+  return defaultSpec || lastSelectedSpec || modelSpecs?.[0];
 }
 
 /** Gets the default spec iconURL by order or definition.
@@ -258,7 +208,7 @@ export function getIconEndpoint({
   iconURL?: string | null;
   endpoint?: string | null;
 }) {
-  return (endpointsConfig?.[iconURL ?? ''] ? (iconURL ?? endpoint) : endpoint) ?? '';
+  return (endpointsConfig?.[iconURL ?? ''] ? iconURL ?? endpoint : endpoint) ?? '';
 }
 
 /** Gets the key to use for the default endpoint iconURL, as defined by the custom config */
@@ -269,7 +219,7 @@ export function getIconKey({
   endpointIconURL: iconURL,
 }: {
   endpoint?: string | null;
-  endpointsConfig?: t.TEndpointsConfig | null;
+  endpointsConfig?: t.TEndpointsConfig;
   endpointType?: string | null;
   endpointIconURL?: string;
 }): keyof IconsRecord {
@@ -278,7 +228,7 @@ export function getIconKey({
   if (endpointIconURL && EModelEndpoint[endpointIconURL] != null) {
     return endpointIconURL;
   }
-  return endpointType ? 'unknown' : (endpoint ?? 'unknown');
+  return endpointType ? 'unknown' : endpoint ?? 'unknown';
 }
 
 export const getEntity = ({

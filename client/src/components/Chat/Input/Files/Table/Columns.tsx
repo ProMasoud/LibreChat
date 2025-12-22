@@ -1,22 +1,16 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { ArrowUpDown, Database } from 'lucide-react';
 import { FileSources, FileContext } from 'librechat-data-provider';
-import {
-  Button,
-  Checkbox,
-  OpenAIMinimalIcon,
-  AzureMinimalIcon,
-  useMediaQuery,
-} from '@librechat/client';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { TFile } from 'librechat-data-provider';
+import { Button, Checkbox, OpenAIMinimalIcon, AzureMinimalIcon } from '~/components';
 import ImagePreview from '~/components/Chat/Input/Files/ImagePreview';
 import FilePreview from '~/components/Chat/Input/Files/FilePreview';
-import { TranslationKeys, useLocalize } from '~/hooks';
 import { SortFilterHeader } from './SortFilterHeader';
+import { useLocalize, useMediaQuery } from '~/hooks';
 import { formatDate, getFileType } from '~/utils';
 
-const contextMap: Record<any, TranslationKeys> = {
+const contextMap = {
   [FileContext.avatar]: 'com_ui_avatar',
   [FileContext.unknown]: 'com_ui_unknown',
   [FileContext.assistants]: 'com_ui_assistants',
@@ -74,7 +68,7 @@ export const columns: ColumnDef<TFile>[] = [
     },
     cell: ({ row }) => {
       const file = row.original;
-      if (file.type?.startsWith('image')) {
+      if (file.type.startsWith('image')) {
         return (
           <div className="flex gap-2">
             <ImagePreview
@@ -82,7 +76,7 @@ export const columns: ColumnDef<TFile>[] = [
               className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md"
               source={file.source}
             />
-            <span className="self-center truncate">{file.filename}</span>
+            <span className="self-center truncate ">{file.filename}</span>
           </div>
         );
       }
@@ -133,8 +127,8 @@ export const columns: ColumnDef<TFile>[] = [
             ),
           }}
           valueMap={{
-            [FileSources.azure]: 'com_ui_azure',
-            [FileSources.openai]: 'com_ui_openai',
+            [FileSources.azure]: 'Azure',
+            [FileSources.openai]: 'OpenAI',
             [FileSources.local]: 'com_ui_host',
           }}
         />
@@ -188,7 +182,7 @@ export const columns: ColumnDef<TFile>[] = [
       const localize = useLocalize();
       return (
         <div className="flex flex-wrap items-center gap-2">
-          {localize(contextMap[context ?? FileContext.unknown])}
+          {localize(contextMap[context ?? FileContext.unknown] ?? 'com_ui_unknown')}
         </div>
       );
     },

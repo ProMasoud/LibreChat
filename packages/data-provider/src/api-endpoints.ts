@@ -1,72 +1,18 @@
 import type { AssistantsEndpoint } from './schemas';
-import * as q from './types/queries';
-import { ResourceType } from './accessPermissions';
 
-let BASE_URL = '';
-if (
-  typeof process === 'undefined' ||
-  (process as typeof process & { browser?: boolean }).browser === true
-) {
-  // process is only available in node context, or process.browser is true in client-side code
-  // This is to ensure that the BASE_URL is set correctly based on the <base>
-  // element in the HTML document, if it exists.
-  const baseEl = document.querySelector('base');
-  BASE_URL = baseEl?.getAttribute('href') || '/';
-}
+export const health = () => '/health';
+export const user = () => '/api/user';
 
-if (BASE_URL && BASE_URL.endsWith('/')) {
-  BASE_URL = BASE_URL.slice(0, -1);
-}
+export const balance = () => '/api/balance';
 
-export const apiBaseUrl = () => BASE_URL;
+export const userPlugins = () => '/api/user/plugins';
 
-// Testing this buildQuery function
-const buildQuery = (params: Record<string, unknown>): string => {
-  const query = Object.entries(params)
-    .filter(([, value]) => {
-      if (Array.isArray(value)) {
-        return value.length > 0;
-      }
-      return value !== undefined && value !== null && value !== '';
-    })
-    .map(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map((v) => `${key}=${encodeURIComponent(v)}`).join('&');
-      }
-      return `${key}=${encodeURIComponent(String(value))}`;
-    })
-    .join('&');
-  return query ? `?${query}` : '';
-};
+export const deleteUser = () => '/api/user/delete';
 
-export const health = () => `${BASE_URL}/health`;
-export const user = () => `${BASE_URL}/api/user`;
+export const messages = (conversationId: string, messageId?: string) =>
+  `/api/messages/${conversationId}${messageId != null && messageId ? `/${messageId}` : ''}`;
 
-export const balance = () => `${BASE_URL}/api/balance`;
-
-export const userPlugins = () => `${BASE_URL}/api/user/plugins`;
-
-export const deleteUser = () => `${BASE_URL}/api/user/delete`;
-
-const messagesRoot = `${BASE_URL}/api/messages`;
-
-export const messages = (params: q.MessagesListParams) => {
-  const { conversationId, messageId, ...rest } = params;
-
-  if (conversationId && messageId) {
-    return `${messagesRoot}/${conversationId}/${messageId}`;
-  }
-
-  if (conversationId) {
-    return `${messagesRoot}/${conversationId}`;
-  }
-
-  return `${messagesRoot}${buildQuery(rest)}`;
-};
-
-export const messagesArtifacts = (messageId: string) => `${messagesRoot}/artifact/${messageId}`;
-
-const shareRoot = `${BASE_URL}/api/share`;
+const shareRoot = '/api/share';
 export const shareMessages = (shareId: string) => `${shareRoot}/${shareId}`;
 export const getSharedLink = (conversationId: string) => `${shareRoot}/link/${conversationId}`;
 export const getSharedLinks = (
@@ -83,7 +29,7 @@ export const getSharedLinks = (
 export const createSharedLink = (conversationId: string) => `${shareRoot}/${conversationId}`;
 export const updateSharedLink = (shareId: string) => `${shareRoot}/${shareId}`;
 
-const keysEndpoint = `${BASE_URL}/api/keys`;
+const keysEndpoint = '/api/keys';
 
 export const keys = () => keysEndpoint;
 
@@ -93,11 +39,14 @@ export const revokeUserKey = (name: string) => `${keysEndpoint}/${name}`;
 
 export const revokeAllUserKeys = () => `${keysEndpoint}?all=true`;
 
-export const conversationsRoot = `${BASE_URL}/api/convos`;
+export const abortRequest = (endpoint: string) => `/api/ask/${endpoint}/abort`;
 
-export const conversations = (params: q.ConversationListParams) => {
-  return `${conversationsRoot}${buildQuery(params)}`;
-};
+export const conversationsRoot = '/api/convos';
+
+export const conversations = (pageNumber: string, isArchived?: boolean, tags?: string[]) =>
+  `${conversationsRoot}?pageNumber=${pageNumber}${
+    isArchived === true ? '&isArchived=true' : ''
+  }${tags?.map((tag) => `&tags=${tag}`).join('')}`;
 
 export const conversationById = (id: string) => `${conversationsRoot}/${id}`;
 
@@ -105,9 +54,7 @@ export const genTitle = () => `${conversationsRoot}/gen_title`;
 
 export const updateConversation = () => `${conversationsRoot}/update`;
 
-export const deleteConversation = () => `${conversationsRoot}`;
-
-export const deleteAllConversation = () => `${conversationsRoot}/all`;
+export const deleteConversation = () => `${conversationsRoot}/clear`;
 
 export const importConversation = () => `${conversationsRoot}/import`;
 
@@ -115,67 +62,49 @@ export const forkConversation = () => `${conversationsRoot}/fork`;
 
 export const duplicateConversation = () => `${conversationsRoot}/duplicate`;
 
-export const search = (q: string, cursor?: string | null) =>
-  `${BASE_URL}/api/search?q=${q}${cursor ? `&cursor=${cursor}` : ''}`;
+export const search = (q: string, pageNumber: string) =>
+  `/api/search?q=${q}&pageNumber=${pageNumber}`;
 
-export const searchEnabled = () => `${BASE_URL}/api/search/enable`;
+export const searchEnabled = () => '/api/search/enable';
 
-export const presets = () => `${BASE_URL}/api/presets`;
+export const presets = () => '/api/presets';
 
-export const deletePreset = () => `${BASE_URL}/api/presets/delete`;
+export const deletePreset = () => '/api/presets/delete';
 
-export const aiEndpoints = () => `${BASE_URL}/api/endpoints`;
+export const aiEndpoints = () => '/api/endpoints';
 
-export const models = () => `${BASE_URL}/api/models`;
+export const endpointsConfigOverride = () => '/api/endpoints/config/override';
 
-export const tokenizer = () => `${BASE_URL}/api/tokenizer`;
+export const models = () => '/api/models';
 
-export const login = () => `${BASE_URL}/api/auth/login`;
+export const tokenizer = () => '/api/tokenizer';
 
-export const logout = () => `${BASE_URL}/api/auth/logout`;
+export const login = () => '/api/auth/login';
 
-export const register = () => `${BASE_URL}/api/auth/register`;
+export const logout = () => '/api/auth/logout';
 
-export const loginFacebook = () => `${BASE_URL}/api/auth/facebook`;
+export const register = () => '/api/auth/register';
 
-export const loginGoogle = () => `${BASE_URL}/api/auth/google`;
+export const loginFacebook = () => '/api/auth/facebook';
+
+export const loginGoogle = () => '/api/auth/google';
 
 export const refreshToken = (retry?: boolean) =>
-  `${BASE_URL}/api/auth/refresh${retry === true ? '?retry=true' : ''}`;
+  `/api/auth/refresh${retry === true ? '?retry=true' : ''}`;
 
-export const requestPasswordReset = () => `${BASE_URL}/api/auth/requestPasswordReset`;
+export const requestPasswordReset = () => '/api/auth/requestPasswordReset';
 
-export const resetPassword = () => `${BASE_URL}/api/auth/resetPassword`;
+export const resetPassword = () => '/api/auth/resetPassword';
 
-export const verifyEmail = () => `${BASE_URL}/api/user/verify`;
+export const verifyEmail = () => '/api/user/verify';
 
-// Auth page URLs (for client-side navigation and redirects)
-export const loginPage = () => `${BASE_URL}/login`;
-export const registerPage = () => `${BASE_URL}/register`;
+export const resendVerificationEmail = () => '/api/user/verify/resend';
 
-export const resendVerificationEmail = () => `${BASE_URL}/api/user/verify/resend`;
+export const plugins = () => '/api/plugins';
 
-export const plugins = () => `${BASE_URL}/api/plugins`;
+export const config = () => '/api/config';
 
-export const mcpReinitialize = (serverName: string) =>
-  `${BASE_URL}/api/mcp/${serverName}/reinitialize`;
-export const mcpConnectionStatus = () => `${BASE_URL}/api/mcp/connection/status`;
-export const mcpServerConnectionStatus = (serverName: string) =>
-  `${BASE_URL}/api/mcp/connection/status/${serverName}`;
-export const mcpAuthValues = (serverName: string) => {
-  return `${BASE_URL}/api/mcp/${serverName}/auth-values`;
-};
-
-export const cancelMCPOAuth = (serverName: string) => {
-  return `${BASE_URL}/api/mcp/oauth/cancel/${serverName}`;
-};
-
-export const config = () => `${BASE_URL}/api/config`;
-
-export const prompts = () => `${BASE_URL}/api/prompts`;
-
-export const addPromptToGroup = (groupId: string) =>
-  `${BASE_URL}/api/prompts/groups/${groupId}/prompts`;
+export const prompts = () => '/api/prompts';
 
 export const assistants = ({
   path = '',
@@ -190,7 +119,7 @@ export const assistants = ({
   version: number | string;
   isAvatar?: boolean;
 }) => {
-  let url = isAvatar === true ? `${images()}/assistants` : `${BASE_URL}/api/assistants/v${version}`;
+  let url = isAvatar === true ? `${images()}/assistants` : `/api/assistants/v${version}`;
 
   if (path && path !== '') {
     url += `/${path}`;
@@ -212,7 +141,7 @@ export const assistants = ({
 };
 
 export const agents = ({ path = '', options }: { path?: string; options?: object }) => {
-  let url = `${BASE_URL}/api/agents`;
+  let url = '/api/agents';
 
   if (path && path !== '') {
     url += `/${path}`;
@@ -226,19 +155,7 @@ export const agents = ({ path = '', options }: { path?: string; options?: object
   return url;
 };
 
-export const mcp = {
-  tools: `${BASE_URL}/api/mcp/tools`,
-};
-
-export const revertAgentVersion = (agent_id: string) => `${agents({ path: `${agent_id}/revert` })}`;
-
-export const files = () => `${BASE_URL}/api/files`;
-export const fileUpload = () => `${BASE_URL}/api/files`;
-export const fileDelete = () => `${BASE_URL}/api/files`;
-export const fileDownload = (userId: string, fileId: string) =>
-  `${BASE_URL}/api/files/download/${userId}/${fileId}`;
-export const fileConfig = () => `${BASE_URL}/api/files/config`;
-export const agentFiles = (agentId: string) => `${BASE_URL}/api/files/agent/${agentId}`;
+export const files = () => '/api/files';
 
 export const images = () => `${files()}/images`;
 
@@ -260,19 +177,8 @@ export const getPromptGroup = (_id: string) => `${prompts()}/groups/${_id}`;
 
 export const getPromptGroupsWithFilters = (filter: object) => {
   let url = `${prompts()}/groups`;
-  // Filter out undefined/null values
-  const cleanedFilter = Object.entries(filter).reduce(
-    (acc, [key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        acc[key] = value;
-      }
-      return acc;
-    },
-    {} as Record<string, string>,
-  );
-
-  if (Object.keys(cleanedFilter).length > 0) {
-    const queryParams = new URLSearchParams(cleanedFilter).toString();
+  if (Object.keys(filter).length > 0) {
+    const queryParams = new URLSearchParams(filter as Record<string, string>).toString();
     url += `?${queryParams}`;
   }
   return url;
@@ -306,25 +212,19 @@ export const deletePrompt = ({ _id, groupId }: { _id: string; groupId: string })
   return `${prompts()}/${_id}?groupId=${groupId}`;
 };
 
-export const getCategories = () => `${BASE_URL}/api/categories`;
+export const getCategories = () => '/api/categories';
 
 export const getAllPromptGroups = () => `${prompts()}/all`;
 
 /* Roles */
-export const roles = () => `${BASE_URL}/api/roles`;
+export const roles = () => '/api/roles';
 export const getRole = (roleName: string) => `${roles()}/${roleName.toLowerCase()}`;
 export const updatePromptPermissions = (roleName: string) => `${getRole(roleName)}/prompts`;
-export const updateMemoryPermissions = (roleName: string) => `${getRole(roleName)}/memories`;
 export const updateAgentPermissions = (roleName: string) => `${getRole(roleName)}/agents`;
-export const updatePeoplePickerPermissions = (roleName: string) =>
-  `${getRole(roleName)}/people-picker`;
-
-export const updateMarketplacePermissions = (roleName: string) =>
-  `${getRole(roleName)}/marketplace`;
 
 /* Conversation Tags */
 export const conversationTags = (tag?: string) =>
-  `${BASE_URL}/api/tags${tag != null && tag ? `/${encodeURIComponent(tag)}` : ''}`;
+  `/api/tags${tag != null && tag ? `/${encodeURIComponent(tag)}` : ''}`;
 
 export const conversationTagsList = (pageNumber: string, sort?: string, order?: string) =>
   `${conversationTags()}/list?pageNumber=${pageNumber}${sort ? `&sort=${sort}` : ''}${
@@ -334,54 +234,6 @@ export const conversationTagsList = (pageNumber: string, sort?: string, order?: 
 export const addTagToConversation = (conversationId: string) =>
   `${conversationTags()}/convo/${conversationId}`;
 
-export const userTerms = () => `${BASE_URL}/api/user/terms`;
-export const acceptUserTerms = () => `${BASE_URL}/api/user/terms/accept`;
-export const banner = () => `${BASE_URL}/api/banner`;
-
-// Message Feedback
-export const feedback = (conversationId: string, messageId: string) =>
-  `${BASE_URL}/api/messages/${conversationId}/${messageId}/feedback`;
-
-// Two-Factor Endpoints
-export const enableTwoFactor = () => `${BASE_URL}/api/auth/2fa/enable`;
-export const verifyTwoFactor = () => `${BASE_URL}/api/auth/2fa/verify`;
-export const confirmTwoFactor = () => `${BASE_URL}/api/auth/2fa/confirm`;
-export const disableTwoFactor = () => `${BASE_URL}/api/auth/2fa/disable`;
-export const regenerateBackupCodes = () => `${BASE_URL}/api/auth/2fa/backup/regenerate`;
-export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
-
-/* Memories */
-export const memories = () => `${BASE_URL}/api/memories`;
-export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;
-export const memoryPreferences = () => `${memories()}/preferences`;
-
-export const searchPrincipals = (params: q.PrincipalSearchParams) => {
-  const { q: query, limit, types } = params;
-  let url = `${BASE_URL}/api/permissions/search-principals?q=${encodeURIComponent(query)}`;
-
-  if (limit !== undefined) {
-    url += `&limit=${limit}`;
-  }
-
-  if (types && types.length > 0) {
-    url += `&types=${types.join(',')}`;
-  }
-
-  return url;
-};
-
-export const getAccessRoles = (resourceType: ResourceType) =>
-  `${BASE_URL}/api/permissions/${resourceType}/roles`;
-
-export const getResourcePermissions = (resourceType: ResourceType, resourceId: string) =>
-  `${BASE_URL}/api/permissions/${resourceType}/${resourceId}`;
-
-export const updateResourcePermissions = (resourceType: ResourceType, resourceId: string) =>
-  `${BASE_URL}/api/permissions/${resourceType}/${resourceId}`;
-
-export const getEffectivePermissions = (resourceType: ResourceType, resourceId: string) =>
-  `${BASE_URL}/api/permissions/${resourceType}/${resourceId}/effective`;
-
-// SharePoint Graph API Token
-export const graphToken = (scopes: string) =>
-  `${BASE_URL}/api/auth/graph-token?scopes=${encodeURIComponent(scopes)}`;
+export const userTerms = () => '/api/user/terms';
+export const acceptUserTerms = () => '/api/user/terms/accept';
+export const banner = () => '/api/banner';

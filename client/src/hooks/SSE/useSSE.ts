@@ -4,29 +4,19 @@ import { SSE } from 'sse.js';
 import { useSetRecoilState } from 'recoil';
 import {
   request,
-  Constants,
   /* @ts-ignore */
   createPayload,
-  LocalStorageKeys,
+  isAgentsEndpoint,
   removeNullishValues,
+  isAssistantsEndpoint,
 } from 'librechat-data-provider';
-import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
+import type { EventSubmission, TMessage, TPayload, TSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
 import { useGenTitleMutation, useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
-
-const clearDraft = (conversationId?: string | null) => {
-  if (conversationId) {
-    localStorage.removeItem(`${LocalStorageKeys.TEXT_DRAFT}${conversationId}`);
-    localStorage.removeItem(`${LocalStorageKeys.FILES_DRAFT}${conversationId}`);
-  } else {
-    localStorage.removeItem(`${LocalStorageKeys.TEXT_DRAFT}${Constants.NEW_CONVO}`);
-    localStorage.removeItem(`${LocalStorageKeys.FILES_DRAFT}${Constants.NEW_CONVO}`);
-  }
-};
 
 type ChatHelpers = Pick<
   EventHandlerParams,
@@ -62,7 +52,6 @@ export default function useSSE(
   } = chatHelpers;
 
   const {
-    clearStepMaps,
     stepHandler,
     syncHandler,
     finalHandler,
@@ -87,7 +76,7 @@ export default function useSSE(
 
   const { data: startupConfig } = useGetStartupConfig();
   const balanceQuery = useGetUserBalance({
-    enabled: !!isAuthenticated && startupConfig?.balance?.enabled,
+    enabled: !!isAuthenticated && startupConfig?.checkBalance,
   });
 
   useEffect(() => {
@@ -99,10 +88,11 @@ export default function useSSE(
 
     const payloadData = createPayload(submission);
     let { payload } = payloadData;
-    payload = removeNullishValues(payload) as TPayload;
+    if (isAssistantsEndpoint(payload.endpoint) || isAgentsEndpoint(payload.endpoint)) {
+      payload = removeNullishValues(payload) as TPayload;
+    }
 
     let textIndex = null;
-    clearStepMaps();
 
     const sse = new SSE(payloadData.server, {
       payload: JSON.stringify(payload),
@@ -122,16 +112,9 @@ export default function useSSE(
       const data = JSON.parse(e.data);
 
       if (data.final != null) {
-        clearDraft(submission.conversation?.conversationId);
         const { plugins } = data;
-        try {
-          finalHandler(data, { ...submission, plugins } as EventSubmission);
-        } catch (error) {
-          console.error('Error in finalHandler:', error);
-          setIsSubmitting(false);
-          setShowStopButton(false);
-        }
-        (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+        finalHandler(data, { ...submission, plugins } as EventSubmission);
+        (startupConfig?.checkBalance ?? false) && balanceQuery.refetch();
         console.log('final', data);
         return;
       } else if (data.created != null) {
@@ -193,20 +176,11 @@ export default function useSSE(
       setCompleted((prev) => new Set(prev.add(streamKey)));
       const latestMessages = getMessages();
       const conversationId = latestMessages?.[latestMessages.length - 1]?.conversationId;
-      try {
-        await abortConversation(
-          conversationId ??
-            userMessage.conversationId ??
-            submission.conversation?.conversationId ??
-            '',
-          submission as EventSubmission,
-          latestMessages,
-        );
-      } catch (error) {
-        console.error('Error during abort:', error);
-        setIsSubmitting(false);
-        setShowStopButton(false);
-      }
+      return await abortConversation(
+        conversationId ?? userMessage.conversationId ?? submission.conversationId,
+        submission as EventSubmission,
+        latestMessages,
+      );
     });
 
     sse.addEventListener('error', async (e: MessageEvent) => {
@@ -234,7 +208,7 @@ export default function useSSE(
       }
 
       console.log('error in server stream.');
-      (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+      (startupConfig?.checkBalance ?? false) && balanceQuery.refetch();
 
       let data: TResData | undefined = undefined;
       try {

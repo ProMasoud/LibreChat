@@ -1,5 +1,5 @@
-const { logger } = require('@librechat/data-schemas');
-const { getAppConfig } = require('~/server/services/Config');
+const { getCustomConfig } = require('~/server/services/Config');
+const { logger } = require('~/config');
 
 /**
  * This function retrieves the speechTab settings from the custom configuration
@@ -15,53 +15,43 @@ const { getAppConfig } = require('~/server/services/Config');
  */
 async function getCustomConfigSpeech(req, res) {
   try {
-    const appConfig = await getAppConfig({
-      role: req.user?.role,
-    });
+    const customConfig = await getCustomConfig();
 
-    if (!appConfig) {
+    if (!customConfig) {
       return res.status(200).send({
         message: 'not_found',
       });
     }
 
-    const sttExternal = !!appConfig.speech?.stt;
-    const ttsExternal = !!appConfig.speech?.tts;
+    const sttExternal = !!customConfig.speech?.stt;
+    const ttsExternal = !!customConfig.speech?.tts;
     let settings = {
       sttExternal,
       ttsExternal,
     };
 
-    if (!appConfig.speech?.speechTab) {
+    if (!customConfig.speech?.speechTab) {
       return res.status(200).send(settings);
     }
 
-    const speechTab = appConfig.speech.speechTab;
+    const speechTab = customConfig.speech.speechTab;
 
     if (speechTab.advancedMode !== undefined) {
       settings.advancedMode = speechTab.advancedMode;
     }
 
-    if (speechTab.speechToText !== undefined) {
-      if (typeof speechTab.speechToText === 'boolean') {
-        settings.speechToText = speechTab.speechToText;
-      } else {
-        for (const key in speechTab.speechToText) {
-          if (speechTab.speechToText[key] !== undefined) {
-            settings[key] = speechTab.speechToText[key];
-          }
+    if (speechTab.speechToText) {
+      for (const key in speechTab.speechToText) {
+        if (speechTab.speechToText[key] !== undefined) {
+          settings[key] = speechTab.speechToText[key];
         }
       }
     }
 
-    if (speechTab.textToSpeech !== undefined) {
-      if (typeof speechTab.textToSpeech === 'boolean') {
-        settings.textToSpeech = speechTab.textToSpeech;
-      } else {
-        for (const key in speechTab.textToSpeech) {
-          if (speechTab.textToSpeech[key] !== undefined) {
-            settings[key] = speechTab.textToSpeech[key];
-          }
+    if (speechTab.textToSpeech) {
+      for (const key in speechTab.textToSpeech) {
+        if (speechTab.textToSpeech[key] !== undefined) {
+          settings[key] = speechTab.textToSpeech[key];
         }
       }
     }

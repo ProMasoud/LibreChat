@@ -2,17 +2,6 @@ import { useState, useCallback, useMemo } from 'react';
 import { ArrowUpLeft } from 'lucide-react';
 import { useSetRecoilState } from 'recoil';
 import {
-  Button,
-  Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  useToastContext,
-} from '@librechat/client';
-import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -30,10 +19,20 @@ import {
   mergeFileConfig,
   megabyte,
   isAssistantsEndpoint,
-  getEndpointFileConfig,
   type TFile,
 } from 'librechat-data-provider';
-import { useFileMapContext, useChatContext } from '~/Providers';
+
+import {
+  Button,
+  Input,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '~/components/ui';
+import { useFileMapContext, useChatContext, useToastContext } from '~/Providers';
 import { useLocalize, useUpdateFiles } from '~/hooks';
 import { useGetFileConfig } from '~/data-provider';
 import store from '~/store';
@@ -87,7 +86,7 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
   const fileMap = useFileMapContext();
   const { showToast } = useToastContext();
   const { setFiles, conversation } = useChatContext();
-  const { data: fileConfig = null } = useGetFileConfig({
+  const { data: fileConfig = defaultFileConfig } = useGetFileConfig({
     select: (data) => mergeFileConfig(data),
   });
   const { addFile } = useUpdateFiles(setFiles);
@@ -104,7 +103,6 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
 
       const fileData = fileMap[file.file_id];
       const endpoint = conversation.endpoint;
-      const endpointType = conversation.endpointType;
 
       if (!fileData.source) {
         return;
@@ -128,31 +126,20 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
         });
       }
 
-      const endpointFileConfig = getEndpointFileConfig({
-        fileConfig,
-        endpoint,
-        endpointType,
-      });
+      const { fileSizeLimit, supportedMimeTypes } =
+        fileConfig.endpoints[endpoint] ?? fileConfig.endpoints.default;
 
-      if (endpointFileConfig.disabled === true) {
-        showToast({
-          message: localize('com_ui_attach_error_disabled'),
-          status: 'error',
-        });
-        return;
-      }
-
-      if (fileData.bytes > (endpointFileConfig.fileSizeLimit ?? Number.MAX_SAFE_INTEGER)) {
+      if (fileData.bytes > fileSizeLimit) {
         showToast({
           message: `${localize('com_ui_attach_error_size')} ${
-            (endpointFileConfig.fileSizeLimit ?? 0) / megabyte
+            fileSizeLimit / megabyte
           } MB (${endpoint})`,
           status: 'error',
         });
         return;
       }
 
-      if (!defaultFileConfig.checkType(file.type, endpointFileConfig.supportedMimeTypes ?? [])) {
+      if (!defaultFileConfig.checkType(file.type, supportedMimeTypes)) {
         showToast({
           message: `${localize('com_ui_attach_error_type')} ${file.type} (${endpoint})`,
           status: 'error',
@@ -172,10 +159,9 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
         filename: fileData.filename,
         source: fileData.source,
         size: fileData.bytes,
-        metadata: fileData.metadata,
       });
     },
-    [addFile, fileMap, conversation, localize, showToast, fileConfig],
+    [addFile, fileMap, conversation, localize, showToast, fileConfig.endpoints],
   );
 
   const filenameFilter = table.getColumn('filename')?.getFilterValue() as string;
@@ -293,7 +279,7 @@ export default function DataTable<TData, TValue>({ columns, data }: DataTablePro
           onClick={() => setShowFiles(true)}
           aria-label={localize('com_sidepanel_manage_files')}
         >
-          <ArrowUpLeft className="h-4 w-4" aria-hidden="true" />
+          <ArrowUpLeft className="h-4 w-4" />
           <span className="ml-2">{localize('com_sidepanel_manage_files')}</span>
         </Button>
 

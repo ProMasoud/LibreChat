@@ -1,10 +1,10 @@
 const fs = require('fs');
 const LdapStrategy = require('passport-ldapauth');
-const { logger } = require('@librechat/data-schemas');
-const { SystemRoles, ErrorTypes } = require('librechat-data-provider');
-const { isEnabled, getBalanceConfig, isEmailDomainAllowed } = require('@librechat/api');
-const { createUser, findUser, updateUser, countUsers } = require('~/models');
-const { getAppConfig } = require('~/server/services/Config');
+const { SystemRoles } = require('librechat-data-provider');
+const { findUser, createUser, updateUser } = require('~/models/userMethods');
+const { countUsers } = require('~/models/userMethods');
+const { isEnabled } = require('~/server/utils');
+const logger = require('~/utils/logger');
 
 const {
   LDAP_URL,
@@ -18,12 +18,11 @@ const {
   LDAP_USERNAME,
   LDAP_EMAIL,
   LDAP_TLS_REJECT_UNAUTHORIZED,
-  LDAP_STARTTLS,
 } = process.env;
 
 // Check required environment variables
 if (!LDAP_URL || !LDAP_USER_SEARCH_BASE) {
-  module.exports = null;
+  return null;
 }
 
 const searchAttributes = [
@@ -51,7 +50,6 @@ if (LDAP_EMAIL) {
   searchAttributes.push(LDAP_EMAIL);
 }
 const rejectUnauthorized = isEnabled(LDAP_TLS_REJECT_UNAUTHORIZED);
-const startTLS = isEnabled(LDAP_STARTTLS);
 
 const ldapOptions = {
   server: {
@@ -74,7 +72,6 @@ const ldapOptions = {
         })(),
       },
     }),
-    ...(startTLS && { starttls: true }),
   },
   usernameField: 'email',
   passwordField: 'password',
@@ -90,14 +87,6 @@ const ldapLogin = new LdapStrategy(ldapOptions, async (userinfo, done) => {
       (LDAP_ID && userinfo[LDAP_ID]) || userinfo.uid || userinfo.sAMAccountName || userinfo.mail;
 
     let user = await findUser({ ldapId });
-    if (user && user.provider !== 'ldap') {
-      logger.info(
-        `[ldapStrategy] User ${user.email} already exists with provider ${user.provider}`,
-      );
-      return done(null, false, {
-        message: ErrorTypes.AUTH_FAILED,
-      });
-    }
 
     const fullNameAttributes = LDAP_FULL_NAME && LDAP_FULL_NAME.split(',');
     const fullName =
@@ -108,8 +97,7 @@ const ldapLogin = new LdapStrategy(ldapOptions, async (userinfo, done) => {
     const username =
       (LDAP_USERNAME && userinfo[LDAP_USERNAME]) || userinfo.givenName || userinfo.mail;
 
-    let mail = (LDAP_EMAIL && userinfo[LDAP_EMAIL]) || userinfo.mail || username + '@ldap.local';
-    mail = Array.isArray(mail) ? mail[0] : mail;
+    const mail = (LDAP_EMAIL && userinfo[LDAP_EMAIL]) || userinfo.mail || username + '@ldap.local';
 
     if (!userinfo.mail && !(LDAP_EMAIL && userinfo[LDAP_EMAIL])) {
       logger.warn(
@@ -122,18 +110,8 @@ const ldapLogin = new LdapStrategy(ldapOptions, async (userinfo, done) => {
       );
     }
 
-    const appConfig = await getAppConfig();
-    if (!isEmailDomainAllowed(mail, appConfig?.registration?.allowedDomains)) {
-      logger.error(
-        `[LDAP Strategy] Authentication blocked - email domain not allowed [Email: ${mail}]`,
-      );
-      return done(null, false, { message: 'Email domain not allowed' });
-    }
-
     if (!user) {
       const isFirstRegisteredUser = (await countUsers()) === 0;
-      const role = isFirstRegisteredUser ? SystemRoles.ADMIN : SystemRoles.USER;
-
       user = {
         provider: 'ldap',
         ldapId,
@@ -141,10 +119,9 @@ const ldapLogin = new LdapStrategy(ldapOptions, async (userinfo, done) => {
         email: mail,
         emailVerified: true, // The ldap server administrator should verify the email
         name: fullName,
-        role,
+        role: isFirstRegisteredUser ? SystemRoles.ADMIN : SystemRoles.USER,
       };
-      const balanceConfig = getBalanceConfig(appConfig);
-      const userId = await createUser(user, balanceConfig);
+      const userId = await createUser(user);
       user._id = userId;
     } else {
       // Users registered in LDAP are assumed to have their user information managed in LDAP,

@@ -1,13 +1,13 @@
-import { getEndpointField, isAssistantsEndpoint } from 'librechat-data-provider';
+import { isAssistantsEndpoint } from 'librechat-data-provider';
 import type {
-  TPreset,
   TConversation,
-  TAssistantsMap,
   TEndpointsConfig,
+  TPreset,
+  TAssistantsMap,
 } from 'librechat-data-provider';
 import ConvoIconURL from '~/components/Endpoints/ConvoIconURL';
 import MinimalIcon from '~/components/Endpoints/MinimalIcon';
-import { getIconEndpoint } from '~/utils';
+import { getEndpointField, getIconEndpoint } from '~/utils';
 
 export default function EndpointIcon({
   conversation,
@@ -63,6 +63,7 @@ export default function EndpointIcon({
         isCreatedByUser={false}
         chatGptLabel={undefined}
         modelLabel={undefined}
+        jailbreak={undefined}
       />
     );
   }

@@ -1,6 +1,5 @@
-const { logger } = require('@librechat/data-schemas');
+const { logger } = require('~/config');
 const { deleteNullOrEmptyConversations } = require('~/models/Conversation');
-
 const cleanup = async () => {
   try {
     await deleteNullOrEmptyConversations();

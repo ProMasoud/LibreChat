@@ -1,10 +1,10 @@
 const path = require('path');
-const mongoose = require('mongoose');
-const { getBalanceConfig } = require('@librechat/api');
-const { User, Balance } = require('@librechat/data-schemas').createModels(mongoose);
 require('module-alias')({ base: path.resolve(__dirname, '..', 'api') });
 const { askQuestion, silentExit } = require('./helpers');
+const { isEnabled } = require('~/server/utils/handleText');
+const User = require('~/models/User');
 const connect = require('./connect');
+const Balance = require('~/models/Balance');
 
 (async () => {
   await connect();
@@ -31,10 +31,15 @@ const connect = require('./connect');
     // console.purple(`[DEBUG] Args Length: ${process.argv.length}`);
   }
 
-  const balanceConfig = getBalanceConfig();
-  if (!balanceConfig?.enabled) {
+  if (!process.env.CHECK_BALANCE) {
     console.red(
-      'Error: Balance is not enabled. Use librechat.yaml to enable it',
+      'Error: CHECK_BALANCE environment variable is not set! Configure it to use it: `CHECK_BALANCE=true`',
+    );
+    silentExit(1);
+  }
+  if (isEnabled(process.env.CHECK_BALANCE) === false) {
+    console.red(
+      'Error: CHECK_BALANCE environment variable is set to `false`! Please configure: `CHECK_BALANCE=true`',
     );
     silentExit(1);
   }
@@ -93,7 +98,7 @@ const connect = require('./connect');
   }
 
   // Check the result
-  if (result?.tokenCredits == null) {
+  if (!result?.tokenCredits) {
     console.red('Error: Something went wrong while updating the balance!');
     console.error(result);
     silentExit(1);

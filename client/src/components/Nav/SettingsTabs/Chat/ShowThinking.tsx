@@ -1,18 +1,19 @@
-import { useAtom } from 'jotai';
-import { Switch, InfoHoverCard, ESide } from '@librechat/client';
-import { showThinkingAtom } from '~/store/showThinking';
-import { useLocalize } from '~/hooks';
+import { useRecoilState } from 'recoil';
+import HoverCardSettings from '../HoverCardSettings';
+import { Switch } from '~/components/ui';
+import useLocalize from '~/hooks/useLocalize';
+import store from '~/store';
 
 export default function SaveDraft({
   onCheckedChange,
 }: {
   onCheckedChange?: (value: boolean) => void;
 }) {
-  const [showThinking, setShowThinking] = useAtom(showThinkingAtom);
+  const [showThinking, setSaveDrafts] = useRecoilState<boolean>(store.showThinking);
   const localize = useLocalize();
 
   const handleCheckedChange = (value: boolean) => {
-    setShowThinking(value);
+    setSaveDrafts(value);
     if (onCheckedChange) {
       onCheckedChange(value);
     }
@@ -22,7 +23,7 @@ export default function SaveDraft({
     <div className="flex items-center justify-between">
       <div className="flex items-center space-x-2">
         <div>{localize('com_nav_show_thinking')}</div>
-        <InfoHoverCard side={ESide.Bottom} text={localize('com_nav_info_show_thinking')} />
+        <HoverCardSettings side="bottom" text="com_nav_info_show_thinking" />
       </div>
       <Switch
         id="showThinking"
@@ -30,7 +31,6 @@ export default function SaveDraft({
         onCheckedChange={handleCheckedChange}
         className="ml-4"
         data-testid="showThinking"
-        aria-label={localize('com_nav_show_thinking')}
       />
     </div>
   );

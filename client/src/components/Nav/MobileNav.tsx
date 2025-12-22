@@ -5,14 +5,11 @@ import { QueryKeys, Constants } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { Dispatch, SetStateAction } from 'react';
 import { useLocalize, useNewConvo } from '~/hooks';
-import { clearMessagesCache } from '~/utils';
 import store from '~/store';
 
 export default function MobileNav({
-  navVisible,
   setNavVisible,
 }: {
-  navVisible: boolean;
   setNavVisible: Dispatch<SetStateAction<boolean>>;
 }) {
   const localize = useLocalize();
@@ -27,7 +24,7 @@ export default function MobileNav({
         type="button"
         data-testid="mobile-header-new-chat-button"
         aria-label={localize('com_nav_open_sidebar')}
-        className={`m-1 inline-flex size-10 items-center justify-center rounded-full hover:bg-surface-hover ${navVisible ? 'invisible' : ''}`}
+        className="m-1 inline-flex size-10 items-center justify-center rounded-full hover:bg-surface-hover"
         onClick={() =>
           setNavVisible((prev) => {
             localStorage.setItem('navVisible', JSON.stringify(!prev));
@@ -60,8 +57,10 @@ export default function MobileNav({
         aria-label={localize('com_ui_new_chat')}
         className="m-1 inline-flex size-10 items-center justify-center rounded-full hover:bg-surface-hover"
         onClick={() => {
-          clearMessagesCache(queryClient, conversation?.conversationId);
-          queryClient.invalidateQueries([QueryKeys.messages]);
+          queryClient.setQueryData<TMessage[]>(
+            [QueryKeys.messages, conversation?.conversationId ?? Constants.NEW_CONVO],
+            [],
+          );
           newConversation();
         }}
       >

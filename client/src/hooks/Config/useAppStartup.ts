@@ -5,9 +5,6 @@ import { LocalStorageKeys } from 'librechat-data-provider';
 import { useAvailablePluginsQuery } from 'librechat-data-provider/react-query';
 import type { TStartupConfig, TPlugin, TUser } from 'librechat-data-provider';
 import { mapPlugins, selectPlugins, processPlugins } from '~/utils';
-import { cleanupTimestampedStorage } from '~/utils/timestamps';
-import useSpeechSettingsInit from './useSpeechSettingsInit';
-import { useMCPToolsQuery } from '~/data-provider';
 import store from '~/store';
 
 const pluginStore: TPlugin = {
@@ -33,17 +30,6 @@ export default function useAppStartup({
     enabled: !!user?.plugins,
     select: selectPlugins,
   });
-
-  useSpeechSettingsInit(!!user);
-
-  useMCPToolsQuery({
-    enabled: !!startupConfig?.mcpServers && !!user,
-  });
-
-  /** Clean up old localStorage entries on startup */
-  useEffect(() => {
-    cleanupTimestampedStorage();
-  }, []);
 
   /** Set the app title */
   useEffect(() => {
@@ -90,6 +76,7 @@ export default function useAppStartup({
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const userPlugins = user.plugins ?? [];
 
     if (userPlugins.length === 0) {

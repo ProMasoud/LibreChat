@@ -1,15 +1,8 @@
 import React, { useState } from 'react';
 import { useClearConversationsMutation } from 'librechat-data-provider/react-query';
-import {
-  OGDialogTemplate,
-  Label,
-  Button,
-  OGDialog,
-  OGDialogTrigger,
-  Spinner,
-} from '@librechat/client';
-import { clearAllConversationStorage } from '~/utils';
+import { Label, Button, OGDialog, OGDialogTrigger, Spinner } from '~/components';
 import { useLocalize, useNewConvo } from '~/hooks';
+import OGDialogTemplate from '~/components/ui/OGDialogTemplate';
 
 export const ClearChats = () => {
   const localize = useLocalize();
@@ -22,7 +15,6 @@ export const ClearChats = () => {
       {},
       {
         onSuccess: () => {
-          clearAllConversationStorage();
           newConversation();
         },
       },
@@ -31,12 +23,12 @@ export const ClearChats = () => {
 
   return (
     <div className="flex items-center justify-between">
-      <Label id="clear-all-chats-label">{localize('com_nav_clear_all_chats')}</Label>
+      <Label className="font-light">{localize('com_nav_clear_all_chats')}</Label>
       <OGDialog open={open} onOpenChange={setOpen}>
         <OGDialogTrigger asChild>
           <Button
-            aria-labelledby="clear-all-chats-label"
             variant="destructive"
+            className="flex items-center justify-center rounded-lg transition-colors duration-200"
             onClick={() => setOpen(true)}
           >
             {localize('com_ui_delete')}
@@ -47,7 +39,7 @@ export const ClearChats = () => {
           title={localize('com_nav_confirm_clear')}
           className="max-w-[450px]"
           main={
-            <Label className="break-words">
+            <Label className="text-left text-sm font-medium">
               {localize('com_nav_clear_conversation_confirm_message')}
             </Label>
           }

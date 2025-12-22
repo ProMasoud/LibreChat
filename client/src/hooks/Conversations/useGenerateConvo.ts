@@ -1,18 +1,18 @@
 import { useRecoilValue } from 'recoil';
 import { useCallback, useRef, useEffect } from 'react';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
-import { getEndpointField, LocalStorageKeys, isAssistantsEndpoint } from 'librechat-data-provider';
+import { LocalStorageKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import type {
-  TEndpointsConfig,
-  EModelEndpoint,
+  TPreset,
   TModelsConfig,
   TConversation,
-  TPreset,
+  TEndpointsConfig,
+  EModelEndpoint,
 } from 'librechat-data-provider';
-import type { AssistantListItem } from '~/common';
 import type { SetterOrUpdater } from 'recoil';
+import type { AssistantListItem } from '~/common';
+import { getEndpointField, buildDefaultConvo, getDefaultEndpoint } from '~/utils';
 import useAssistantListMap from '~/hooks/Assistants/useAssistantListMap';
-import { buildDefaultConvo, getDefaultEndpoint, logger } from '~/utils';
 import { useGetEndpointsQuery } from '~/data-provider';
 import { mainTextareaId } from '~/common';
 import store from '~/store';
@@ -44,7 +44,6 @@ const useGenerateConvo = ({
           conversationId: rootConvo.conversationId,
         } as TConversation;
 
-        logger.log('conversation', 'Setting conversation from `useNewConvo`', update);
         return update;
       });
     }

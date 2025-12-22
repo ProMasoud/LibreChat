@@ -1,10 +1,10 @@
 // errorHandler.js
-const { logger } = require('@librechat/data-schemas');
+const { logger } = require('~/config');
+const getLogStores = require('~/cache/getLogStores');
 const { CacheKeys, ViolationTypes } = require('librechat-data-provider');
-const { sendResponse } = require('~/server/middleware/error');
 const { recordUsage } = require('~/server/services/Threads');
 const { getConvo } = require('~/models/Conversation');
-const getLogStores = require('~/cache/getLogStores');
+const { sendResponse } = require('~/server/utils');
 
 /**
  * @typedef {Object} ErrorHandlerContext
@@ -21,7 +21,7 @@ const getLogStores = require('~/cache/getLogStores');
 
 /**
  * @typedef {Object} ErrorHandlerDependencies
- * @property {ServerRequest} req - The Express request object
+ * @property {Express.Request} req - The Express request object
  * @property {Express.Response} res - The Express response object
  * @property {() => ErrorHandlerContext} getContext - Function to get the current context
  * @property {string} [originPath] - The origin path for the error handler
@@ -75,7 +75,7 @@ const createErrorHandler = ({ req, res, getContext, originPath = '/assistants/ch
     } else if (/Files.*are invalid/.test(error.message)) {
       const errorMessage = `Files are invalid, or may not have uploaded yet.${
         endpoint === 'azureAssistants'
-          ? " If using Azure OpenAI, files are only available in the region of the assistant's model at the time of upload."
+          ? ' If using Azure OpenAI, files are only available in the region of the assistant\'s model at the time of upload.'
           : ''
       }`;
       return sendResponse(req, res, messageData, errorMessage);
@@ -105,6 +105,8 @@ const createErrorHandler = ({ req, res, getContext, originPath = '/assistants/ch
         return res.end();
       }
       await cache.delete(cacheKey);
+      // const cancelledRun = await openai.beta.threads.runs.cancel(thread_id, run_id);
+      // logger.debug(`[${originPath}] Cancelled run:`, cancelledRun);
     } catch (error) {
       logger.error(`[${originPath}] Error cancelling run`, error);
     }
@@ -113,6 +115,7 @@ const createErrorHandler = ({ req, res, getContext, originPath = '/assistants/ch
 
     let run;
     try {
+      // run = await openai.beta.threads.runs.retrieve(thread_id, run_id);
       await recordUsage({
         ...run.usage,
         model: run.model,
@@ -125,9 +128,18 @@ const createErrorHandler = ({ req, res, getContext, originPath = '/assistants/ch
 
     let finalEvent;
     try {
+      // const errorContentPart = {
+      //   text: {
+      //     value:
+      //       error?.message ?? 'There was an error processing your request. Please try again later.',
+      //   },
+      //   type: ContentTypes.ERROR,
+      // };
+
       finalEvent = {
         final: true,
         conversation: await getConvo(req.user.id, conversationId),
+        // runMessages,
       };
     } catch (error) {
       logger.error(`[${originPath}] Error finalizing error process`, error);

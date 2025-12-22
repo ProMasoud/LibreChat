@@ -1,7 +1,9 @@
 import { useMemo, useState, useCallback } from 'react';
+import { OptionTypes } from 'librechat-data-provider';
 import type { DynamicSettingProps } from 'librechat-data-provider';
-import { Label, HoverCard, HoverCardTrigger, ControlCombobox } from '@librechat/client';
-import { TranslationKeys, useLocalize, useParameterEffects } from '~/hooks';
+import { Label, HoverCard, HoverCardTrigger } from '~/components/ui';
+import ControlCombobox from '~/components/ui/ControlCombobox';
+import { useLocalize, useParameterEffects } from '~/hooks';
 import { useChatContext } from '~/Providers';
 import OptionHover from './OptionHover';
 import { ESide } from '~/common';
@@ -14,6 +16,7 @@ function DynamicCombobox({
   description = '',
   columnSpan,
   setOption,
+  optionType,
   options: _options,
   items: _items,
   showLabel = true,
@@ -33,8 +36,11 @@ function DynamicCombobox({
   const [inputValue, setInputValue] = useState<string | null>(null);
 
   const selectedValue = useMemo(() => {
+    if (optionType === OptionTypes.Custom) {
+      return inputValue;
+    }
     return conversation?.[settingKey] ?? defaultValue;
-  }, [conversation, defaultValue, settingKey]);
+  }, [conversation, defaultValue, optionType, settingKey, inputValue]);
 
   const items = useMemo(() => {
     if (_items != null) {
@@ -48,10 +54,13 @@ function DynamicCombobox({
 
   const handleChange = useCallback(
     (value: string) => {
-      setInputValue(value);
-      setOption(settingKey)(value);
+      if (optionType === OptionTypes.Custom) {
+        setInputValue(value);
+      } else {
+        setOption(settingKey)(value);
+      }
     },
-    [setOption, settingKey],
+    [optionType, setOption, settingKey],
   );
 
   useParameterEffects({
@@ -84,7 +93,7 @@ function DynamicCombobox({
                 htmlFor={`${settingKey}-dynamic-combobox`}
                 className="text-left text-sm font-medium"
               >
-                {labelCode ? (localize(label as TranslationKeys) ?? label) : label || settingKey}
+                {labelCode ? localize(label) ?? label : label || settingKey}
                 {showDefault && (
                   <small className="opacity-40">
                     ({localize('com_endpoint_default')}: {defaultValue})
@@ -96,14 +105,10 @@ function DynamicCombobox({
           <ControlCombobox
             displayValue={selectedValue}
             selectPlaceholder={
-              selectPlaceholderCode === true
-                ? localize(selectPlaceholder as TranslationKeys)
-                : selectPlaceholder
+              selectPlaceholderCode === true ? localize(selectPlaceholder) : selectPlaceholder
             }
             searchPlaceholder={
-              searchPlaceholderCode === true
-                ? localize(searchPlaceholder as TranslationKeys)
-                : searchPlaceholder
+              searchPlaceholderCode === true ? localize(searchPlaceholder) : searchPlaceholder
             }
             isCollapsed={isCollapsed}
             ariaLabel={settingKey}
@@ -115,11 +120,7 @@ function DynamicCombobox({
         </HoverCardTrigger>
         {description && (
           <OptionHover
-            description={
-              descriptionCode
-                ? (localize(description as TranslationKeys) ?? description)
-                : description
-            }
+            description={descriptionCode ? localize(description) ?? description : description}
             side={ESide.Left}
           />
         )}

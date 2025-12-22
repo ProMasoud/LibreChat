@@ -1,5 +1,4 @@
 const fs = require('fs').promises;
-const { logger } = require('@librechat/data-schemas');
 const { FileContext } = require('librechat-data-provider');
 const { uploadImageBuffer, filterFile } = require('~/server/services/Files/process');
 const validateAuthor = require('~/server/middleware/assistants/validateAuthor');
@@ -7,9 +6,9 @@ const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { deleteAssistantActions } = require('~/server/services/ActionService');
 const { updateAssistantDoc, getAssistants } = require('~/models/Assistant');
 const { getOpenAIClient, fetchAssistants } = require('./helpers');
-const { getCachedTools } = require('~/server/services/Config');
 const { manifestToolMap } = require('~/app/clients/tools');
 const { deleteFileByFilter } = require('~/models/File');
+const { logger } = require('~/config');
 
 /**
  * Create an assistant.
@@ -31,20 +30,21 @@ const createAssistant = async (req, res) => {
     delete assistantData.conversation_starters;
     delete assistantData.append_current_datetime;
 
-    const toolDefinitions = await getCachedTools();
-
     assistantData.tools = tools
       .map((tool) => {
         if (typeof tool !== 'string') {
           return tool;
         }
 
+        const toolDefinitions = req.app.locals.availableTools;
         const toolDef = toolDefinitions[tool];
         if (!toolDef && manifestToolMap[tool] && manifestToolMap[tool].toolkit === true) {
-          return Object.entries(toolDefinitions)
-            .filter(([key]) => key.startsWith(`${tool}_`))
-
-            .map(([_, val]) => val);
+          return (
+            Object.entries(toolDefinitions)
+              .filter(([key]) => key.startsWith(`${tool}_`))
+              // eslint-disable-next-line no-unused-vars
+              .map(([_, val]) => val)
+          );
         }
 
         return toolDef;
@@ -135,21 +135,21 @@ const patchAssistant = async (req, res) => {
       append_current_datetime,
       ...updateData
     } = req.body;
-
-    const toolDefinitions = await getCachedTools();
-
     updateData.tools = (updateData.tools ?? [])
       .map((tool) => {
         if (typeof tool !== 'string') {
           return tool;
         }
 
+        const toolDefinitions = req.app.locals.availableTools;
         const toolDef = toolDefinitions[tool];
         if (!toolDef && manifestToolMap[tool] && manifestToolMap[tool].toolkit === true) {
-          return Object.entries(toolDefinitions)
-            .filter(([key]) => key.startsWith(`${tool}_`))
-
-            .map(([_, val]) => val);
+          return (
+            Object.entries(toolDefinitions)
+              .filter(([key]) => key.startsWith(`${tool}_`))
+              // eslint-disable-next-line no-unused-vars
+              .map(([_, val]) => val)
+          );
         }
 
         return toolDef;
@@ -197,7 +197,7 @@ const deleteAssistant = async (req, res) => {
     await validateAuthor({ req, openai });
 
     const assistant_id = req.params.id;
-    const deletionStatus = await openai.beta.assistants.delete(assistant_id);
+    const deletionStatus = await openai.beta.assistants.del(assistant_id);
     if (deletionStatus?.deleted) {
       await deleteAssistantActions({ req, assistant_id });
     }
@@ -258,9 +258,8 @@ function filterAssistantDocs({ documents, userId, assistantsConfig = {} }) {
  */
 const getAssistantDocuments = async (req, res) => {
   try {
-    const appConfig = req.config;
     const endpoint = req.query;
-    const assistantsConfig = appConfig.endpoints?.[endpoint];
+    const assistantsConfig = req.app.locals[endpoint];
     const documents = await getAssistants(
       {},
       {
@@ -297,7 +296,6 @@ const getAssistantDocuments = async (req, res) => {
  */
 const uploadAssistantAvatar = async (req, res) => {
   try {
-    const appConfig = req.config;
     filterFile({ req, file: req.file, image: true, isAvatar: true });
     const { assistant_id } = req.params;
     if (!assistant_id) {
@@ -339,7 +337,7 @@ const uploadAssistantAvatar = async (req, res) => {
     const metadata = {
       ..._metadata,
       avatar: image.filepath,
-      avatar_source: appConfig.fileStrategy,
+      avatar_source: req.app.locals.fileStrategy,
     };
 
     const promises = [];
@@ -349,7 +347,7 @@ const uploadAssistantAvatar = async (req, res) => {
         {
           avatar: {
             filepath: image.filepath,
-            source: appConfig.fileStrategy,
+            source: req.app.locals.fileStrategy,
           },
           user: req.user.id,
         },
@@ -367,7 +365,7 @@ const uploadAssistantAvatar = async (req, res) => {
     try {
       await fs.unlink(req.file.path);
       logger.debug('[/:agent_id/avatar] Temp. image upload file deleted');
-    } catch {
+    } catch (error) {
       logger.debug('[/:agent_id/avatar] Temp. image upload file already deleted');
     }
   }

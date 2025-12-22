@@ -1,18 +1,36 @@
 import { useRecoilValue } from 'recoil';
 import { useEffect, useMemo } from 'react';
-import { FileSources, LocalStorageKeys } from 'librechat-data-provider';
+import { FileSources, LocalStorageKeys, getConfigDefaults } from 'librechat-data-provider';
 import type { ExtendedFile } from '~/common';
-import { useDeleteFilesMutation } from '~/data-provider';
+import { useDeleteFilesMutation, useGetStartupConfig } from '~/data-provider';
 import DragDropWrapper from '~/components/Chat/Input/Files/DragDropWrapper';
-import { EditorProvider, SidePanelProvider, ArtifactsProvider } from '~/Providers';
 import Artifacts from '~/components/Artifacts/Artifacts';
-import { SidePanelGroup } from '~/components/SidePanel';
+import { SidePanel } from '~/components/SidePanel';
 import { useSetFilesToDelete } from '~/hooks';
+import { EditorProvider } from '~/Providers';
 import store from '~/store';
 
-export default function Presentation({ children }: { children: React.ReactNode }) {
+const defaultInterface = getConfigDefaults().interface;
+
+export default function Presentation({
+  children,
+  useSidePanel = false,
+  panel,
+}: {
+  children: React.ReactNode;
+  panel?: React.ReactNode;
+  useSidePanel?: boolean;
+}) {
+  const { data: startupConfig } = useGetStartupConfig();
   const artifacts = useRecoilValue(store.artifactsState);
-  const artifactsVisibility = useRecoilValue(store.artifactsVisibility);
+  const codeArtifacts = useRecoilValue(store.codeArtifacts);
+  const hideSidePanel = useRecoilValue(store.hideSidePanel);
+  const artifactsVisible = useRecoilValue(store.artifactsVisible);
+
+  const interfaceConfig = useMemo(
+    () => startupConfig?.interface ?? defaultInterface,
+    [startupConfig],
+  );
 
   const setFilesToDelete = useSetFilesToDelete();
 
@@ -57,37 +75,43 @@ export default function Presentation({ children }: { children: React.ReactNode }
   }, []);
   const fullCollapse = useMemo(() => localStorage.getItem('fullPanelCollapse') === 'true', []);
 
-  /**
-   * Memoize artifacts JSX to prevent recreating it on every render
-   * This is critical for performance - prevents entire artifact tree from re-rendering
-   */
-  const artifactsElement = useMemo(() => {
-    if (artifactsVisibility === true && Object.keys(artifacts ?? {}).length > 0) {
-      return (
-        <ArtifactsProvider>
-          <EditorProvider>
-            <Artifacts />
-          </EditorProvider>
-        </ArtifactsProvider>
-      );
-    }
-    return null;
-  }, [artifactsVisibility, artifacts]);
+  const layout = () => (
+    <div className="transition-width relative flex h-full w-full flex-1 flex-col items-stretch overflow-hidden bg-presentation pt-0">
+      <div className="flex h-full flex-col" role="presentation">
+        {children}
+      </div>
+    </div>
+  );
 
-  return (
-    <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
-      <SidePanelProvider>
-        <SidePanelGroup
+  if (useSidePanel && !hideSidePanel && interfaceConfig.sidePanel === true) {
+    return (
+      <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
+        <SidePanel
           defaultLayout={defaultLayout}
-          fullPanelCollapse={fullCollapse}
           defaultCollapsed={defaultCollapsed}
-          artifacts={artifactsElement}
+          fullPanelCollapse={fullCollapse}
+          artifacts={
+            artifactsVisible === true &&
+            codeArtifacts === true &&
+            Object.keys(artifacts ?? {}).length > 0 ? (
+                <EditorProvider>
+                  <Artifacts />
+                </EditorProvider>
+              ) : null
+          }
         >
           <main className="flex h-full flex-col overflow-y-auto" role="main">
             {children}
           </main>
-        </SidePanelGroup>
-      </SidePanelProvider>
+        </SidePanel>
+      </DragDropWrapper>
+    );
+  }
+
+  return (
+    <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
+      {layout()}
+      {panel != null && panel}
     </DragDropWrapper>
   );
 }

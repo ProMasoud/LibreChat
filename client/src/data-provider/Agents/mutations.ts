@@ -1,15 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { dataService, MutationKeys, PermissionBits, QueryKeys } from 'librechat-data-provider';
+import { dataService, MutationKeys, QueryKeys, defaultOrderQuery } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
-import type { QueryClient, UseMutationResult } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
 
 /**
  * AGENTS
  */
-export const allAgentViewAndEditQueryKeys: t.AgentListParams[] = [
-  { requiredPermission: PermissionBits.VIEW },
-  { requiredPermission: PermissionBits.EDIT },
-];
+
 /**
  * Create a new agent
  */
@@ -21,22 +18,21 @@ export const useCreateAgentMutation = (
     onMutate: (variables) => options?.onMutate?.(variables),
     onError: (error, variables, context) => options?.onError?.(error, variables, context),
     onSuccess: (newAgent, variables, context) => {
-      ((keys: t.AgentListParams[]) => {
-        keys.forEach((key) => {
-          const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
-          if (!listRes) {
-            return options?.onSuccess?.(newAgent, variables, context);
-          }
-          const currentAgents = [newAgent, ...JSON.parse(JSON.stringify(listRes.data))];
+      const listRes = queryClient.getQueryData<t.AgentListResponse>([
+        QueryKeys.agents,
+        defaultOrderQuery,
+      ]);
 
-          queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-            ...listRes,
-            data: currentAgents,
-          });
-        });
-      })(allAgentViewAndEditQueryKeys);
-      invalidateAgentMarketplaceQueries(queryClient);
+      if (!listRes) {
+        return options?.onSuccess?.(newAgent, variables, context);
+      }
 
+      const currentAgents = [newAgent, ...JSON.parse(JSON.stringify(listRes.data))];
+
+      queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, defaultOrderQuery], {
+        ...listRes,
+        data: currentAgents,
+      });
       return options?.onSuccess?.(newAgent, variables, context);
     },
   });
@@ -58,37 +54,28 @@ export const useUpdateAgentMutation = (
     },
     {
       onMutate: (variables) => options?.onMutate?.(variables),
-      onError: (error, variables, context) => {
-        return options?.onError?.(error, variables, context);
-      },
+      onError: (error, variables, context) => options?.onError?.(error, variables, context),
       onSuccess: (updatedAgent, variables, context) => {
-        ((keys: t.AgentListParams[]) => {
-          keys.forEach((key) => {
-            const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
+        const listRes = queryClient.getQueryData<t.AgentListResponse>([
+          QueryKeys.agents,
+          defaultOrderQuery,
+        ]);
 
-            if (!listRes) {
-              return options?.onSuccess?.(updatedAgent, variables, context);
+        if (!listRes) {
+          return options?.onSuccess?.(updatedAgent, variables, context);
+        }
+
+        queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, defaultOrderQuery], {
+          ...listRes,
+          data: listRes.data.map((agent) => {
+            if (agent.id === variables.agent_id) {
+              return updatedAgent;
             }
-
-            queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-              ...listRes,
-              data: listRes.data.map((agent) => {
-                if (agent.id === variables.agent_id) {
-                  return updatedAgent;
-                }
-                return agent;
-              }),
-            });
-          });
-        })(allAgentViewAndEditQueryKeys);
+            return agent;
+          }),
+        });
 
         queryClient.setQueryData<t.Agent>([QueryKeys.agent, variables.agent_id], updatedAgent);
-        queryClient.setQueryData<t.Agent>(
-          [QueryKeys.agent, variables.agent_id, 'expanded'],
-          updatedAgent,
-        );
-        invalidateAgentMarketplaceQueries(queryClient);
-
         return options?.onSuccess?.(updatedAgent, variables, context);
       },
     },
@@ -110,28 +97,23 @@ export const useDeleteAgentMutation = (
       onMutate: (variables) => options?.onMutate?.(variables),
       onError: (error, variables, context) => options?.onError?.(error, variables, context),
       onSuccess: (_data, variables, context) => {
-        const data = ((keys: t.AgentListParams[]) => {
-          let data: t.Agent[] = [];
-          keys.forEach((key) => {
-            const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
+        const listRes = queryClient.getQueryData<t.AgentListResponse>([
+          QueryKeys.agents,
+          defaultOrderQuery,
+        ]);
 
-            if (!listRes) {
-              return options?.onSuccess?.(_data, variables, context);
-            }
+        if (!listRes) {
+          return options?.onSuccess?.(_data, variables, context);
+        }
 
-            data = listRes.data.filter((agent) => agent.id !== variables.agent_id);
+        const data = listRes.data.filter((agent) => agent.id !== variables.agent_id);
 
-            queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-              ...listRes,
-              data,
-            });
-          });
-          return data;
-        })(allAgentViewAndEditQueryKeys);
+        queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, defaultOrderQuery], {
+          ...listRes,
+          data,
+        });
 
         queryClient.removeQueries([QueryKeys.agent, variables.agent_id]);
-        queryClient.removeQueries([QueryKeys.agent, variables.agent_id, 'expanded']);
-        invalidateAgentMarketplaceQueries(queryClient);
 
         return options?.onSuccess?.(_data, variables, data);
       },
@@ -153,23 +135,22 @@ export const useDuplicateAgentMutation = (
       onMutate: options?.onMutate,
       onError: options?.onError,
       onSuccess: ({ agent, actions }, variables, context) => {
-        ((keys: t.AgentListParams[]) => {
-          keys.forEach((key) => {
-            const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
-            if (listRes) {
-              const currentAgents = [agent, ...listRes.data];
-              queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-                ...listRes,
-                data: currentAgents,
-              });
-            }
+        const listRes = queryClient.getQueryData<t.AgentListResponse>([
+          QueryKeys.agents,
+          defaultOrderQuery,
+        ]);
+
+        if (listRes) {
+          const currentAgents = [agent, ...listRes.data];
+          queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, defaultOrderQuery], {
+            ...listRes,
+            data: currentAgents,
           });
-        })(allAgentViewAndEditQueryKeys);
+        }
 
         const existingActions = queryClient.getQueryData<t.Action[]>([QueryKeys.actions]) || [];
 
         queryClient.setQueryData<t.Action[]>([QueryKeys.actions], existingActions.concat(actions));
-        invalidateAgentMarketplaceQueries(queryClient);
 
         return options?.onSuccess?.({ agent, actions }, variables, context);
       },
@@ -188,41 +169,11 @@ export const useUploadAgentAvatarMutation = (
   t.AgentAvatarVariables, // request
   unknown // context
 > => {
-  const queryClient = useQueryClient();
-  return useMutation<t.Agent, unknown, t.AgentAvatarVariables>({
-    mutationKey: [MutationKeys.agentAvatarUpload],
-    mutationFn: (variables: t.AgentAvatarVariables) => dataService.uploadAgentAvatar(variables),
-    onMutate: (variables) => options?.onMutate?.(variables),
-    onError: (error, variables, context) => options?.onError?.(error, variables, context),
-    onSuccess: (updatedAgent, variables, context) => {
-      ((keys: t.AgentListParams[]) => {
-        keys.forEach((key) => {
-          const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
-          if (!listRes) {
-            return;
-          }
-
-          queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-            ...listRes,
-            data: listRes.data.map((agent) => {
-              if (agent.id === variables.agent_id) {
-                return updatedAgent;
-              }
-              return agent;
-            }),
-          });
-        });
-      })(allAgentViewAndEditQueryKeys);
-
-      queryClient.setQueryData<t.Agent>([QueryKeys.agent, variables.agent_id], updatedAgent);
-      queryClient.setQueryData<t.Agent>(
-        [QueryKeys.agent, variables.agent_id, 'expanded'],
-        updatedAgent,
-      );
-      invalidateAgentMarketplaceQueries(queryClient);
-
-      return options?.onSuccess?.(updatedAgent, variables, context);
-    },
+  return useMutation([MutationKeys.agentAvatarUpload], {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    mutationFn: ({ postCreation, ...variables }: t.AgentAvatarVariables) =>
+      dataService.uploadAgentAvatar(variables),
+    ...(options || {}),
   });
 };
 
@@ -245,48 +196,43 @@ export const useUpdateAgentAction = (
     onMutate: (variables) => options?.onMutate?.(variables),
     onError: (error, variables, context) => options?.onError?.(error, variables, context),
     onSuccess: (updateAgentActionResponse, variables, context) => {
-      const updatedAgent = updateAgentActionResponse[0];
-      ((keys: t.AgentListParams[]) => {
-        keys.forEach((key) => {
-          const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
+      const listRes = queryClient.getQueryData<t.AgentListResponse>([
+        QueryKeys.agents,
+        defaultOrderQuery,
+      ]);
 
-          if (!listRes) {
-            return options?.onSuccess?.(updateAgentActionResponse, variables, context);
+      if (!listRes) {
+        return options?.onSuccess?.(updateAgentActionResponse, variables, context);
+      }
+
+      const updatedAgent = updateAgentActionResponse[0];
+
+      queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, defaultOrderQuery], {
+        ...listRes,
+        data: listRes.data.map((agent) => {
+          if (agent.id === variables.agent_id) {
+            return updatedAgent;
           }
-          queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-            ...listRes,
-            data: listRes.data.map((agent) => {
-              if (agent.id === variables.agent_id) {
-                return updatedAgent;
-              }
-              return agent;
-            }),
-          });
-        });
-      })(allAgentViewAndEditQueryKeys);
+          return agent;
+        }),
+      });
 
       queryClient.setQueryData<t.Action[]>([QueryKeys.actions], (prev) => {
-        if (!prev) {
-          return [updateAgentActionResponse[1]];
-        }
-
-        if (variables.action_id) {
-          return prev.map((action) => {
+        return prev
+          ?.map((action) => {
             if (action.action_id === variables.action_id) {
               return updateAgentActionResponse[1];
             }
             return action;
-          });
-        }
-
-        return [...prev, updateAgentActionResponse[1]];
+          })
+          .concat(
+            variables.action_id != null && variables.action_id
+              ? []
+              : [updateAgentActionResponse[1]],
+          );
       });
 
       queryClient.setQueryData<t.Agent>([QueryKeys.agent, variables.agent_id], updatedAgent);
-      queryClient.setQueryData<t.Agent>(
-        [QueryKeys.agent, variables.agent_id, 'expanded'],
-        updatedAgent,
-      );
       return options?.onSuccess?.(updateAgentActionResponse, variables, context);
     },
   });
@@ -317,29 +263,30 @@ export const useDeleteAgentAction = (
           return action.action_id !== variables.action_id;
         });
       });
-      ((keys: t.AgentListParams[]) => {
-        keys.forEach((key) => {
-          queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], (prev) => {
-            if (!prev) {
-              return prev;
-            }
 
-            return {
-              ...prev,
-              data: prev.data.map((agent) => {
-                if (agent.id === variables.agent_id) {
-                  return {
-                    ...agent,
-                    tools: agent.tools?.filter((tool) => !tool.includes(domain ?? '')),
-                  };
-                }
-                return agent;
-              }),
-            };
-          });
-        });
-      })(allAgentViewAndEditQueryKeys);
-      const updaterFn = (prev) => {
+      queryClient.setQueryData<t.AgentListResponse>(
+        [QueryKeys.agents, defaultOrderQuery],
+        (prev) => {
+          if (!prev) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            data: prev.data.map((agent) => {
+              if (agent.id === variables.agent_id) {
+                return {
+                  ...agent,
+                  tools: agent.tools?.filter((tool) => !tool.includes(domain ?? '')),
+                };
+              }
+              return agent;
+            }),
+          };
+        },
+      );
+
+      queryClient.setQueryData<t.Agent>([QueryKeys.agent, variables.agent_id], (prev) => {
         if (!prev) {
           return prev;
         }
@@ -348,61 +295,8 @@ export const useDeleteAgentAction = (
           ...prev,
           tools: prev.tools?.filter((tool) => !tool.includes(domain ?? '')),
         };
-      };
-      queryClient.setQueryData<t.Agent>([QueryKeys.agent, variables.agent_id], updaterFn);
-      queryClient.setQueryData<t.Agent>(
-        [QueryKeys.agent, variables.agent_id, 'expanded'],
-        updaterFn,
-      );
+      });
       return options?.onSuccess?.(_data, variables, context);
     },
   });
-};
-
-/**
- * Hook for reverting an agent to a previous version
- */
-export const useRevertAgentVersionMutation = (
-  options?: t.RevertAgentVersionOptions,
-): UseMutationResult<t.Agent, Error, { agent_id: string; version_index: number }> => {
-  const queryClient = useQueryClient();
-  return useMutation(
-    ({ agent_id, version_index }: { agent_id: string; version_index: number }) => {
-      return dataService.revertAgentVersion({
-        agent_id,
-        version_index,
-      });
-    },
-    {
-      onMutate: (variables) => options?.onMutate?.(variables),
-      onError: (error, variables, context) => options?.onError?.(error, variables, context),
-      onSuccess: (revertedAgent, variables, context) => {
-        queryClient.setQueryData<t.Agent>([QueryKeys.agent, variables.agent_id], revertedAgent);
-
-        ((keys: t.AgentListParams[]) => {
-          keys.forEach((key) => {
-            const listRes = queryClient.getQueryData<t.AgentListResponse>([QueryKeys.agents, key]);
-
-            if (listRes) {
-              queryClient.setQueryData<t.AgentListResponse>([QueryKeys.agents, key], {
-                ...listRes,
-                data: listRes.data.map((agent) => {
-                  if (agent.id === variables.agent_id) {
-                    return revertedAgent;
-                  }
-                  return agent;
-                }),
-              });
-            }
-          });
-        })(allAgentViewAndEditQueryKeys);
-
-        return options?.onSuccess?.(revertedAgent, variables, context);
-      },
-    },
-  );
-};
-
-export const invalidateAgentMarketplaceQueries = (queryClient: QueryClient) => {
-  queryClient.invalidateQueries([QueryKeys.marketplaceAgents]);
 };

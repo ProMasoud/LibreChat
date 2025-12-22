@@ -5,14 +5,18 @@ import supersub from 'remark-supersub';
 import rehypeKatex from 'rehype-katex';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import { replaceSpecialVars } from 'librechat-data-provider';
-import { TextareaAutosize, InputCombobox, Button } from '@librechat/client';
 import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import type { TPromptGroup } from 'librechat-data-provider';
-import { codeNoExecution } from '~/components/Chat/Messages/Content/MarkdownComponents';
-import { cn, wrapVariable, defaultTextProps, extractVariableInfo } from '~/utils';
+import {
+  cn,
+  wrapVariable,
+  defaultTextProps,
+  replaceSpecialVars,
+  extractVariableInfo,
+} from '~/utils';
+import { codeNoExecution } from '~/components/Chat/Messages/Content/Markdown';
 import { useAuthContext, useLocalize, useSubmitMessage } from '~/hooks';
-import { PromptVariableGfm } from '../Markdown';
+import { TextareaAutosize, InputCombobox } from '~/components/ui';
 
 type FieldType = 'text' | 'select';
 
@@ -111,12 +115,9 @@ export default function VariableForm({
     allVariables.forEach((variable) => {
       const placeholder = `{{${variable}}}`;
       const fieldIndex = variableIndexMap.get(variable) as string | number;
-      const fieldValue = fieldValues[fieldIndex].value as string | undefined;
-      if (fieldValue === placeholder || fieldValue === '' || !fieldValue) {
-        return;
-      }
-      const highlightText = fieldValue !== '' ? `**${fieldValue}**` : placeholder;
-      tempText = tempText.replaceAll(placeholder, highlightText);
+      const fieldValue = fieldValues[fieldIndex].value as string;
+      const highlightText = fieldValue !== '' ? fieldValue : placeholder;
+      tempText = tempText.replaceAll(placeholder, `**${highlightText}**`);
     });
     return tempText;
   };
@@ -140,19 +141,19 @@ export default function VariableForm({
   return (
     <div className="mx-auto p-1 md:container">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="mb-6 max-h-screen max-w-[90vw] overflow-auto rounded-md bg-surface-tertiary p-4 text-text-secondary dark:bg-surface-primary sm:max-w-full md:max-h-96">
+        <div className="mb-6 max-h-screen max-w-[90vw] overflow-auto rounded-md bg-gray-100 p-4 text-text-secondary dark:bg-gray-700/50 sm:max-w-full md:max-h-80">
           <ReactMarkdown
             /** @ts-ignore */
-            remarkPlugins={[supersub, remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
+            remarkPlugins={[supersub, remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
             rehypePlugins={[
               /** @ts-ignore */
-              [rehypeKatex],
+              [rehypeKatex, { output: 'mathml' }],
               /** @ts-ignore */
               [rehypeHighlight, { ignoreMissing: true }],
             ]}
             /** @ts-ignore */
-            components={{ code: codeNoExecution, p: PromptVariableGfm }}
-            className="markdown prose dark:prose-invert light my-1 max-h-[50vh] max-w-full break-words dark:text-text-secondary"
+            components={{ code: codeNoExecution }}
+            className="prose dark:prose-invert light dark:text-gray-70 my-1 max-h-[50vh] break-words"
           >
             {generateHighlightedMarkdown()}
           </ReactMarkdown>
@@ -168,7 +169,7 @@ export default function VariableForm({
                     return (
                       <InputCombobox
                         options={field.config.options || []}
-                        placeholder={field.config.variable}
+                        placeholder={localize('com_ui_enter_var', field.config.variable)}
                         className={cn(
                           defaultTextProps,
                           'rounded px-3 py-2 focus:bg-surface-tertiary',
@@ -191,9 +192,8 @@ export default function VariableForm({
                         defaultTextProps,
                         'rounded px-3 py-2 focus:bg-surface-tertiary',
                       )}
-                      placeholder={field.config.variable}
+                      placeholder={localize('com_ui_enter_var', field.config.variable)}
                       maxRows={8}
-                      aria-label={field.config.variable}
                     />
                   );
                 }}
@@ -202,9 +202,12 @@ export default function VariableForm({
           ))}
         </div>
         <div className="flex justify-end">
-          <Button type="submit" variant="submit" aria-label={localize('com_ui_submit')}>
+          <button
+            type="submit"
+            className="btn rounded bg-green-500 px-4 py-2 font-bold text-white transition-all hover:bg-green-600"
+          >
             {localize('com_ui_submit')}
-          </Button>
+          </button>
         </div>
       </form>
     </div>

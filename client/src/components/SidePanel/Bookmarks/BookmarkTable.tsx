@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { BookmarkPlusIcon } from 'lucide-react';
+import type { ConversationTagsResponse, TConversationTag } from 'librechat-data-provider';
 import {
   Table,
   Input,
@@ -10,8 +11,7 @@ import {
   TableCell,
   TableHeader,
   OGDialogTrigger,
-} from '@librechat/client';
-import type { ConversationTagsResponse, TConversationTag } from 'librechat-data-provider';
+} from '~/components/ui';
 import { BookmarkContext, useBookmarkContext } from '~/Providers/BookmarkContext';
 import { BookmarkEditDialog } from '~/components/Bookmarks';
 import BookmarkTableRow from './BookmarkTableRow';
@@ -80,13 +80,13 @@ const BookmarkTable = () => {
             <TableHeader>
               <TableRow className="border-b border-border-light">
                 <TableHead className="w-[70%] bg-surface-secondary py-3 text-left text-sm font-medium text-text-secondary">
-                  <div>{localize('com_ui_bookmarks_title')}</div>
+                  <div className="px-4">{localize('com_ui_bookmarks_title')}</div>
                 </TableHead>
                 <TableHead className="w-[30%] bg-surface-secondary py-3 text-left text-sm font-medium text-text-secondary">
-                  <div>{localize('com_ui_bookmarks_count')}</div>
+                  <div className="px-4">{localize('com_ui_bookmarks_count')}</div>
                 </TableHead>
                 <TableHead className="w-[40%] bg-surface-secondary py-3 text-left text-sm font-medium text-text-secondary">
-                  <div>{localize('com_assistants_actions')}</div>
+                  <div className="px-4">{localize('com_assistants_actions')}</div>
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -112,7 +112,6 @@ const BookmarkTable = () => {
                   variant="outline"
                   size="sm"
                   className="w-full gap-2 text-sm"
-                  aria-label={localize('com_ui_bookmarks_new')}
                   onClick={() => setOpen(!open)}
                 >
                   <BookmarkPlusIcon className="size-4" />

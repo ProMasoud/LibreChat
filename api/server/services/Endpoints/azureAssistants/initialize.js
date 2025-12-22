@@ -1,13 +1,19 @@
 const OpenAI = require('openai');
-const { ProxyAgent } = require('undici');
-const { constructAzureURL, isUserProvided, resolveHeaders } = require('@librechat/api');
-const { ErrorTypes, EModelEndpoint, mapModelToAzureConfig } = require('librechat-data-provider');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const {
-  checkUserKeyExpiry,
+  ErrorTypes,
+  EModelEndpoint,
+  resolveHeaders,
+  mapModelToAzureConfig,
+} = require('librechat-data-provider');
+const {
   getUserKeyValues,
   getUserKeyExpiry,
+  checkUserKeyExpiry,
 } = require('~/server/services/UserService');
-const OAIClient = require('~/app/clients/OpenAIClient');
+const OpenAIClient = require('~/app/clients/OpenAIClient');
+const { isUserProvided } = require('~/server/utils');
+const { constructAzureURL } = require('~/utils');
 
 class Files {
   constructor(client) {
@@ -48,7 +54,6 @@ class Files {
 }
 
 const initializeClient = async ({ req, res, version, endpointOption, initAppClient = false }) => {
-  const appConfig = req.config;
   const { PROXY, OPENAI_ORGANIZATION, AZURE_ASSISTANTS_API_KEY, AZURE_ASSISTANTS_BASE_URL } =
     process.env;
 
@@ -82,7 +87,7 @@ const initializeClient = async ({ req, res, version, endpointOption, initAppClie
   };
 
   /** @type {TAzureConfig | undefined} */
-  const azureConfig = appConfig.endpoints?.[EModelEndpoint.azureOpenAI];
+  const azureConfig = req.app.locals[EModelEndpoint.azureOpenAI];
 
   /** @type {AzureOptions | undefined} */
   let azureOptions;
@@ -111,12 +116,9 @@ const initializeClient = async ({ req, res, version, endpointOption, initAppClie
     apiKey = azureOptions.azureOpenAIApiKey;
     opts.defaultQuery = { 'api-version': azureOptions.azureOpenAIApiVersion };
     opts.defaultHeaders = resolveHeaders({
-      headers: {
-        ...headers,
-        'api-key': apiKey,
-        'OpenAI-Beta': `assistants=${version}`,
-      },
-      user: req.user,
+      ...headers,
+      'api-key': apiKey,
+      'OpenAI-Beta': `assistants=${version}`,
     });
     opts.model = azureOptions.azureOpenAIApiDeploymentName;
 
@@ -159,10 +161,7 @@ const initializeClient = async ({ req, res, version, endpointOption, initAppClie
   }
 
   if (PROXY) {
-    const proxyAgent = new ProxyAgent(PROXY);
-    opts.fetchOptions = {
-      dispatcher: proxyAgent,
-    };
+    opts.httpAgent = new HttpsProxyAgent(PROXY);
   }
 
   if (OPENAI_ORGANIZATION) {
@@ -185,7 +184,7 @@ const initializeClient = async ({ req, res, version, endpointOption, initAppClie
   }
 
   if (endpointOption && initAppClient) {
-    const client = new OAIClient(apiKey, clientOptions);
+    const client = new OpenAIClient(apiKey, clientOptions);
     return {
       client,
       openai,

@@ -1,13 +1,8 @@
-const { handleError } = require('@librechat/api');
-const { logger } = require('@librechat/data-schemas');
-const {
-  EndpointURLs,
-  EModelEndpoint,
-  isAgentsEndpoint,
-  parseCompactConvo,
-} = require('librechat-data-provider');
+const { parseCompactConvo, EModelEndpoint, isAgentsEndpoint } = require('librechat-data-provider');
+const { getModelsConfig } = require('~/server/controllers/ModelController');
 const azureAssistants = require('~/server/services/Endpoints/azureAssistants');
 const assistants = require('~/server/services/Endpoints/assistants');
+const gptPlugins = require('~/server/services/Endpoints/gptPlugins');
 const { processFiles } = require('~/server/services/Files/process');
 const anthropic = require('~/server/services/Endpoints/anthropic');
 const bedrock = require('~/server/services/Endpoints/bedrock');
@@ -15,6 +10,8 @@ const openAI = require('~/server/services/Endpoints/openAI');
 const agents = require('~/server/services/Endpoints/agents');
 const custom = require('~/server/services/Endpoints/custom');
 const google = require('~/server/services/Endpoints/google');
+const { getConvoFiles } = require('~/models/Conversation');
+const { handleError } = require('~/server/utils');
 
 const buildFunction = {
   [EModelEndpoint.openAI]: openAI.buildOptions,
@@ -24,6 +21,7 @@ const buildFunction = {
   [EModelEndpoint.bedrock]: bedrock.buildOptions,
   [EModelEndpoint.azureOpenAI]: openAI.buildOptions,
   [EModelEndpoint.anthropic]: anthropic.buildOptions,
+  [EModelEndpoint.gptPlugins]: gptPlugins.buildOptions,
   [EModelEndpoint.assistants]: assistants.buildOptions,
   [EModelEndpoint.azureAssistants]: azureAssistants.buildOptions,
 };
@@ -34,16 +32,12 @@ async function buildEndpointOption(req, res, next) {
   try {
     parsedBody = parseCompactConvo({ endpoint, endpointType, conversation: req.body });
   } catch (error) {
-    logger.warn(
-      `Error parsing conversation for endpoint ${endpoint}${error?.message ? `: ${error.message}` : ''}`,
-    );
     return handleError(res, { text: 'Error parsing conversation' });
   }
 
-  const appConfig = req.config;
-  if (appConfig.modelSpecs?.list && appConfig.modelSpecs?.enforce) {
+  if (req.app.locals.modelSpecs?.list && req.app.locals.modelSpecs?.enforce) {
     /** @type {{ list: TModelSpec[] }}*/
-    const { list } = appConfig.modelSpecs;
+    const { list } = req.app.locals.modelSpecs;
     const { spec } = parsedBody;
 
     if (!spec) {
@@ -59,48 +53,54 @@ async function buildEndpointOption(req, res, next) {
       return handleError(res, { text: 'Model spec mismatch' });
     }
 
+    if (
+      currentModelSpec.preset.endpoint !== EModelEndpoint.gptPlugins &&
+      currentModelSpec.preset.tools
+    ) {
+      return handleError(res, {
+        text: `Only the "${EModelEndpoint.gptPlugins}" endpoint can have tools defined in the preset`,
+      });
+    }
+
     try {
       currentModelSpec.preset.spec = spec;
+      if (currentModelSpec.iconURL != null && currentModelSpec.iconURL !== '') {
+        currentModelSpec.preset.iconURL = currentModelSpec.iconURL;
+      }
       parsedBody = parseCompactConvo({
         endpoint,
         endpointType,
         conversation: currentModelSpec.preset,
       });
-      if (currentModelSpec.iconURL != null && currentModelSpec.iconURL !== '') {
-        parsedBody.iconURL = currentModelSpec.iconURL;
-      }
     } catch (error) {
-      logger.error(`Error parsing model spec for endpoint ${endpoint}`, error);
       return handleError(res, { text: 'Error parsing model spec' });
-    }
-  } else if (parsedBody.spec && appConfig.modelSpecs?.list) {
-    // Non-enforced mode: if spec is selected, derive iconURL from model spec
-    const modelSpec = appConfig.modelSpecs.list.find((s) => s.name === parsedBody.spec);
-    if (modelSpec?.iconURL) {
-      parsedBody.iconURL = modelSpec.iconURL;
     }
   }
 
   try {
-    const isAgents =
-      isAgentsEndpoint(endpoint) || req.baseUrl.startsWith(EndpointURLs[EModelEndpoint.agents]);
-    const builder = isAgents
-      ? (...args) => buildFunction[EModelEndpoint.agents](req, ...args)
-      : buildFunction[endpointType ?? endpoint];
+    const isAgents = isAgentsEndpoint(endpoint);
+    const endpointFn = buildFunction[endpointType ?? endpoint];
+    const builder = isAgents ? (...args) => endpointFn(req, ...args) : endpointFn;
 
     // TODO: use object params
     req.body.endpointOption = await builder(endpoint, parsedBody, endpointType);
 
-    if (req.body.files && !isAgents) {
+    // TODO: use `getModelsConfig` only when necessary
+    const modelsConfig = await getModelsConfig(req);
+    const { resendFiles = true } = req.body.endpointOption;
+    req.body.endpointOption.modelsConfig = modelsConfig;
+    if (isAgents && resendFiles && req.body.conversationId) {
+      const fileIds = await getConvoFiles(req.body.conversationId);
+      const requestFiles = req.body.files ?? [];
+      if (requestFiles.length || fileIds.length) {
+        req.body.endpointOption.attachments = processFiles(requestFiles, fileIds);
+      }
+    } else if (req.body.files) {
+      // hold the promise
       req.body.endpointOption.attachments = processFiles(req.body.files);
     }
-
     next();
   } catch (error) {
-    logger.error(
-      `Error building endpoint option for endpoint ${endpoint} with type ${endpointType}`,
-      error,
-    );
     return handleError(res, { text: 'Error building endpoint option' });
   }
 }

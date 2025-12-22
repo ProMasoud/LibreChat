@@ -1,5 +1,5 @@
 // const OpenAI = require('openai');
-const { ProxyAgent } = require('undici');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 const { ErrorTypes } = require('librechat-data-provider');
 const { getUserKey, getUserKeyExpiry, getUserKeyValues } = require('~/server/services/UserService');
 const initializeClient = require('./initalize');
@@ -107,7 +107,6 @@ describe('initializeClient', () => {
     const res = {};
 
     const { openai } = await initializeClient({ req, res });
-    expect(openai.fetchOptions).toBeDefined();
-    expect(openai.fetchOptions.dispatcher).toBeInstanceOf(ProxyAgent);
+    expect(openai.httpAgent).toBeInstanceOf(HttpsProxyAgent);
   });
 });

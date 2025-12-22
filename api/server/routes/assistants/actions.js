@@ -1,12 +1,12 @@
 const express = require('express');
 const { nanoid } = require('nanoid');
-const { logger } = require('@librechat/data-schemas');
-const { isActionDomainAllowed } = require('@librechat/api');
-const { actionDelimiter, EModelEndpoint, removeNullishValues } = require('librechat-data-provider');
+const { actionDelimiter, EModelEndpoint } = require('librechat-data-provider');
 const { encryptMetadata, domainParser } = require('~/server/services/ActionService');
 const { getOpenAIClient } = require('~/server/controllers/assistants/helpers');
 const { updateAction, getActions, deleteAction } = require('~/models/Action');
 const { updateAssistantDoc, getAssistant } = require('~/models/Assistant');
+const { isActionDomainAllowed } = require('~/server/services/domains');
+const { logger } = require('~/config');
 
 const router = express.Router();
 
@@ -21,7 +21,6 @@ const router = express.Router();
  */
 router.post('/:assistant_id', async (req, res) => {
   try {
-    const appConfig = req.config;
     const { assistant_id } = req.params;
 
     /** @type {{ functions: FunctionTool[], action_id: string, metadata: ActionMetadata }} */
@@ -30,17 +29,14 @@ router.post('/:assistant_id', async (req, res) => {
       return res.status(400).json({ message: 'No functions provided' });
     }
 
-    let metadata = await encryptMetadata(removeNullishValues(_metadata, true));
-    const isDomainAllowed = await isActionDomainAllowed(
-      metadata.domain,
-      appConfig?.actions?.allowedDomains,
-    );
+    let metadata = await encryptMetadata(_metadata);
+    const isDomainAllowed = await isActionDomainAllowed(metadata.domain);
     if (!isDomainAllowed) {
       return res.status(400).json({ message: 'Domain not allowed' });
     }
 
     let { domain } = metadata;
-    domain = await domainParser(domain, true);
+    domain = await domainParser(req, domain, true);
 
     if (!domain) {
       return res.status(400).json({ message: 'No domain provided' });
@@ -129,7 +125,7 @@ router.post('/:assistant_id', async (req, res) => {
     }
 
     /* Map Azure OpenAI model to the assistant as defined by config */
-    if (appConfig.endpoints?.[EModelEndpoint.azureOpenAI]?.assistants) {
+    if (req.app.locals[EModelEndpoint.azureOpenAI]?.assistants) {
       updatedAssistant = {
         ...updatedAssistant,
         model: req.body.model,
@@ -176,7 +172,7 @@ router.delete('/:assistant_id/:action_id/:model', async (req, res) => {
       return true;
     });
 
-    domain = await domainParser(domain, true);
+    domain = await domainParser(req, domain, true);
 
     if (!domain) {
       return res.status(400).json({ message: 'No domain provided' });

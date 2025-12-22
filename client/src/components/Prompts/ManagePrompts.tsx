@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useSetRecoilState } from 'recoil';
-import { Button } from '@librechat/client';
 import { useLocalize, useCustomLink } from '~/hooks';
+import { Button } from '~/components/ui';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -14,19 +14,10 @@ export default function ManagePrompts({ className }: { className?: string }) {
     setPromptsCategory('');
   }, [setPromptsName, setPromptsCategory]);
 
-  const customLink = useCustomLink('/d/prompts', clickCallback);
-  const clickHandler = (e: React.MouseEvent<HTMLButtonElement>) => {
-    customLink(e as unknown as React.MouseEvent<HTMLAnchorElement>);
-  };
+  const clickHandler = useCustomLink('/d/prompts', clickCallback);
 
   return (
-    <Button
-      variant="outline"
-      className={cn(className, 'bg-transparent')}
-      onClick={clickHandler}
-      aria-label="Manage Prompts"
-      role="button"
-    >
+    <Button variant="outline" className={cn(className, 'bg-transparent')} onClick={clickHandler}>
       {localize('com_ui_manage')}
     </Button>
   );

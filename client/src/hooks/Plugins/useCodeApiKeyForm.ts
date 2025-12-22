@@ -1,5 +1,5 @@
 // client/src/hooks/Plugins/useCodeApiKeyForm.ts
-import { useRef, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import type { ApiKeyFormData } from '~/common';
 import useAuthCodeTool from '~/hooks/Plugins/useAuthCodeTool';
@@ -12,8 +12,6 @@ export default function useCodeApiKeyForm({
   onRevoke?: () => void;
 }) {
   const methods = useForm<ApiKeyFormData>();
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
-  const badgeTriggerRef = useRef<HTMLInputElement>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { installTool, removeTool } = useAuthCodeTool({ isEntityTool: true });
   const { reset } = methods;
@@ -41,7 +39,5 @@ export default function useCodeApiKeyForm({
     setIsDialogOpen,
     handleRevokeApiKey,
     onSubmit: onSubmitHandler,
-    badgeTriggerRef,
-    menuTriggerRef,
   };
 }

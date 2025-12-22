@@ -7,7 +7,6 @@ on:
       - release/*
     paths:
       - 'api/**'
-      - 'packages/**'
 jobs:
   tests_Backend:
     name: Run Backend unit tests
@@ -37,12 +36,9 @@ jobs:
       - name: Install Data Provider Package
         run: npm run build:data-provider
 
-      - name: Install Data Schemas Package
-        run: npm run build:data-schemas
-
-      - name: Install API Package
-        run: npm run build:api
-
+      - name: Install MCP Package
+        run: npm run build:mcp
+      
       - name: Create empty auth.json file
         run: |
           mkdir -p api/data
@@ -67,8 +63,7 @@ jobs:
       - name: Run librechat-data-provider unit tests
         run: cd packages/data-provider && npm run test:ci
 
-      - name: Run @librechat/data-schemas unit tests
-        run: cd packages/data-schemas && npm run test:ci
-
-      - name: Run @librechat/api unit tests
-        run: cd packages/api && npm run test:ci
+      - name: Run linters
+        uses: wearerequired/lint-action@v2
+        with:
+          eslint: true

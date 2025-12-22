@@ -2,21 +2,21 @@ import { Column } from '@tanstack/react-table';
 import { ListFilter, FilterX } from 'lucide-react';
 import { ArrowDownIcon, ArrowUpIcon, CaretSortIcon } from '@radix-ui/react-icons';
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@librechat/client';
-import { useLocalize, TranslationKeys } from '~/hooks';
+} from '~/components/ui/DropdownMenu';
+import { Button } from '~/components/ui/Button';
+import useLocalize from '~/hooks/useLocalize';
 import { cn } from '~/utils';
 
 interface SortFilterHeaderProps<TData, TValue> extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   column: Column<TData, TValue>;
   filters?: Record<string, string[] | number[]>;
-  valueMap?: Record<any, TranslationKeys>;
+  valueMap?: Record<string, string>;
 }
 
 export function SortFilterHeader<TData, TValue>({
@@ -78,12 +78,9 @@ export function SortFilterHeader<TData, TValue>({
           <DropdownMenuSeparator className="dark:bg-gray-500" />
           {filters &&
             Object.entries(filters).map(([key, values]) =>
-              values.map((value?: string | number) => {
-                const translationKey = valueMap?.[value ?? ''];
-                const filterValue =
-                  translationKey != null && translationKey.length
-                    ? localize(translationKey)
-                    : String(value);
+              values.map((value: string | number) => {
+                const localizedValue = localize(valueMap?.[value] ?? '');
+                const filterValue = localizedValue.length ? localizedValue : valueMap?.[value];
                 if (!filterValue) {
                   return null;
                 }

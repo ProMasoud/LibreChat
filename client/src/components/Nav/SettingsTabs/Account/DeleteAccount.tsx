@@ -1,7 +1,6 @@
 import { LockIcon, Trash } from 'lucide-react';
 import React, { useState, useCallback } from 'react';
 import {
-  Label,
   Input,
   Button,
   Spinner,
@@ -10,10 +9,9 @@ import {
   OGDialogTrigger,
   OGDialogHeader,
   OGDialogTitle,
-} from '@librechat/client';
+} from '~/components';
 import { useDeleteUserMutation } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
-import { LocalizeFunction } from '~/common';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
@@ -46,11 +44,11 @@ const DeleteAccount = ({ disabled = false }: { title?: string; disabled?: boolea
     <>
       <OGDialog open={isDialogOpen} onOpenChange={setDialogOpen}>
         <div className="flex items-center justify-between">
-          <Label id="delete-account-label">{localize('com_nav_delete_account')}</Label>
+          <span>{localize('com_nav_delete_account')}</span>
           <OGDialogTrigger asChild>
             <Button
-              aria-labelledby="delete-account-label"
               variant="destructive"
+              className="flex items-center justify-center rounded-lg transition-colors duration-200"
               onClick={() => setDialogOpen(true)}
               disabled={disabled}
             >
@@ -58,7 +56,7 @@ const DeleteAccount = ({ disabled = false }: { title?: string; disabled?: boolea
             </Button>
           </OGDialogTrigger>
         </div>
-        <OGDialogContent className="w-11/12 max-w-md">
+        <OGDialogContent className="w-11/12 max-w-2xl">
           <OGDialogHeader>
             <OGDialogTitle className="text-lg font-medium leading-6">
               {localize('com_nav_delete_account_confirm')}
@@ -105,7 +103,7 @@ const renderDeleteButton = (
   handleDeleteUser: () => void,
   isDeleting: boolean,
   isLocked: boolean,
-  localize: LocalizeFunction,
+  localize: (key: string) => string,
 ) => (
   <button
     className={cn(

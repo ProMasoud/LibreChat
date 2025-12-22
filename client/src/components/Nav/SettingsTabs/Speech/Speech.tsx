@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRecoilState } from 'recoil';
 import * as Tabs from '@radix-ui/react-tabs';
 import { Lightbulb, Cog } from 'lucide-react';
-import { useOnClickOutside, useMediaQuery } from '@librechat/client';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useGetCustomConfigSpeechQuery } from 'librechat-data-provider/react-query';
 import {
   CloudBrowserVoicesSwitch,
@@ -22,13 +21,11 @@ import {
   DecibelSelector,
 } from './STT';
 import ConversationModeSwitch from './ConversationModeSwitch';
-import { useLocalize } from '~/hooks';
-import { cn } from '~/utils';
+import { useOnClickOutside, useMediaQuery } from '~/hooks';
+import { cn, logger } from '~/utils';
 import store from '~/store';
 
 function Speech() {
-  const localize = useLocalize();
-
   const [confirmClear, setConfirmClear] = useState(false);
   const { data } = useGetCustomConfigSpeechQuery();
   const isSmallScreen = useMediaQuery('(max-width: 767px)');
@@ -77,10 +74,16 @@ function Speech() {
         playbackRate: { value: playbackRate, setFunc: setPlaybackRate },
       };
 
-      const setting = settings[key];
-      if (setting) {
-        setting.setFunc(newValue);
+      if (
+        (settings[key].value !== newValue || settings[key].value === newValue || !settings[key]) &&
+        settings[key].value === 'sttExternal' &&
+        settings[key].value === 'ttsExternal'
+      ) {
+        return;
       }
+
+      const setting = settings[key];
+      setting.setFunc(newValue);
     },
     [
       sttExternal,
@@ -125,26 +128,13 @@ function Speech() {
   useEffect(() => {
     if (data && data.message !== 'not_found') {
       Object.entries(data).forEach(([key, value]) => {
-        // Only apply config values as defaults if no user preference exists in localStorage
-        const existingValue = localStorage.getItem(key);
-        if (existingValue === null && key !== 'sttExternal' && key !== 'ttsExternal') {
-          updateSetting(key, value);
-        } else if (key === 'sttExternal' || key === 'ttsExternal') {
-          updateSetting(key, value);
-        }
+        updateSetting(key, value);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // Reset engineTTS if it is set to a removed/invalid value (e.g., 'edge')
-  // TODO: remove this once the 'edge' engine is fully deprecated
-  useEffect(() => {
-    const validEngines = ['browser', 'external'];
-    if (!validEngines.includes(engineTTS)) {
-      setEngineTTS('browser');
-    }
-  }, [engineTTS, setEngineTTS]);
+  logger.log({ sttExternal, ttsExternal });
 
   const contentRef = useRef(null);
   useOnClickOutside(contentRef, () => confirmClear && setConfirmClear(false), []);
@@ -168,7 +158,7 @@ function Speech() {
             style={{ userSelect: 'none' }}
           >
             <Lightbulb />
-            {localize('com_ui_simple')}
+            Simple
           </Tabs.Trigger>
           <Tabs.Trigger
             onClick={() => setAdvancedMode(true)}
@@ -181,12 +171,12 @@ function Speech() {
             style={{ userSelect: 'none' }}
           >
             <Cog />
-            {localize('com_ui_advanced')}
+            Advanced
           </Tabs.Trigger>
         </Tabs.List>
       </div>
 
-      <Tabs.Content value={'simple'} tabIndex={-1}>
+      <Tabs.Content value={'simple'}>
         <div className="flex flex-col gap-3 text-sm text-text-primary">
           <SpeechToTextSwitch />
           <EngineSTTDropdown external={sttExternal} />
@@ -198,7 +188,7 @@ function Speech() {
         </div>
       </Tabs.Content>
 
-      <Tabs.Content value={'advanced'} tabIndex={-1}>
+      <Tabs.Content value={'advanced'}>
         <div className="flex flex-col gap-3 text-sm text-text-primary">
           <ConversationModeSwitch />
           <div className="mt-2 h-px bg-border-medium" role="none" />

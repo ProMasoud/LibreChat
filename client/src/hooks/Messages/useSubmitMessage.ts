@@ -1,9 +1,10 @@
 import { v4 } from 'uuid';
 import { useCallback } from 'react';
+import { Constants } from 'librechat-data-provider';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
-import { Constants, replaceSpecialVars } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { replaceSpecialVars } from '~/utils';
 import store from '~/store';
 
 const appendIndex = (index: number, value?: string) => {
@@ -13,7 +14,7 @@ const appendIndex = (index: number, value?: string) => {
   return `${value}${Constants.COMMON_DIVIDER}${index}`;
 };
 
-export default function useSubmitMessage() {
+export default function useSubmitMessage(helpers?: { clearDraft?: () => void }) {
   const { user } = useAuthContext();
   const methods = useChatFormContext();
   const { ask, index, getMessages, setMessages, latestMessage } = useChatContext();
@@ -65,10 +66,12 @@ export default function useSubmitMessage() {
         );
       }
       methods.reset();
+      helpers?.clearDraft && helpers.clearDraft();
     },
     [
       ask,
       methods,
+      helpers,
       addedIndex,
       addedConvo,
       setMessages,

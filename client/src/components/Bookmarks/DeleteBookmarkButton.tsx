@@ -1,17 +1,11 @@
 import { useCallback, useState } from 'react';
-import {
-  Button,
-  TrashIcon,
-  Label,
-  OGDialog,
-  OGDialogTrigger,
-  TooltipAnchor,
-  OGDialogTemplate,
-  useToastContext,
-} from '@librechat/client';
 import type { FC } from 'react';
+import { Label, OGDialog, OGDialogTrigger, TooltipAnchor } from '~/components/ui';
 import { useDeleteConversationTagMutation } from '~/data-provider';
+import OGDialogTemplate from '~/components/ui/OGDialogTemplate';
 import { NotificationSeverity } from '~/common';
+import { useToastContext } from '~/Providers';
+import { TrashIcon } from '~/components/svg';
 import { useLocalize } from '~/hooks';
 
 const DeleteBookmarkButton: FC<{
@@ -42,31 +36,36 @@ const DeleteBookmarkButton: FC<{
     await deleteBookmarkMutation.mutateAsync(bookmark);
   }, [bookmark, deleteBookmarkMutation]);
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(!open);
+    }
+  };
+
   return (
     <>
       <OGDialog open={open} onOpenChange={setOpen}>
         <OGDialogTrigger asChild>
           <TooltipAnchor
+            role="button"
+            aria-label={localize('com_ui_bookmarks_delete')}
             description={localize('com_ui_delete')}
-            render={
-              <Button
-                variant="ghost"
-                aria-label={localize('com_ui_bookmarks_delete')}
-                tabIndex={tabIndex}
-                onFocus={onFocus}
-                onBlur={onBlur}
-                onClick={() => setOpen(!open)}
-                className="h-8 w-8 p-0"
-              >
-                <TrashIcon />
-              </Button>
-            }
-          />
+            className="flex size-7 items-center justify-center rounded-lg transition-colors duration-200 hover:bg-surface-hover"
+            tabIndex={tabIndex}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            onClick={() => setOpen(!open)}
+            onKeyDown={handleKeyDown}
+          >
+            <TrashIcon className="size-4" />
+          </TooltipAnchor>
         </OGDialogTrigger>
         <OGDialogTemplate
           showCloseButton={false}
           title={localize('com_ui_bookmarks_delete')}
-          className="w-11/12 max-w-lg"
+          className="max-w-[450px]"
           main={
             <Label className="text-left text-sm font-medium">
               {localize('com_ui_bookmark_delete_confirm')} {bookmark}

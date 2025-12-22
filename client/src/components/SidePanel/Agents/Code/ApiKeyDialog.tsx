@@ -1,7 +1,7 @@
-import { OGDialogTemplate, Input, Button, OGDialog } from '@librechat/client';
 import type { UseFormRegister, UseFormHandleSubmit } from 'react-hook-form';
 import type { ApiKeyFormData } from '~/common';
-import type { RefObject } from 'react';
+import OGDialogTemplate from '~/components/ui/OGDialogTemplate';
+import { Input, Button, OGDialog } from '~/components/ui';
 import { useLocalize } from '~/hooks';
 
 export default function ApiKeyDialog({
@@ -13,8 +13,6 @@ export default function ApiKeyDialog({
   isToolAuthenticated,
   register,
   handleSubmit,
-  triggerRef,
-  triggerRefs,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,8 +22,6 @@ export default function ApiKeyDialog({
   isToolAuthenticated: boolean;
   register: UseFormRegister<ApiKeyFormData>;
   handleSubmit: UseFormHandleSubmit<ApiKeyFormData>;
-  triggerRef?: RefObject<HTMLInputElement | HTMLButtonElement>;
-  triggerRefs?: RefObject<HTMLInputElement | HTMLButtonElement>[];
 }) {
   const localize = useLocalize();
   const languageIcons = [
@@ -42,12 +38,7 @@ export default function ApiKeyDialog({
   ];
 
   return (
-    <OGDialog
-      open={isOpen}
-      onOpenChange={onOpenChange}
-      triggerRef={triggerRef}
-      triggerRefs={triggerRefs}
-    >
+    <OGDialog open={isOpen} onOpenChange={onOpenChange}>
       <OGDialogTemplate
         className="w-11/12 sm:w-[450px]"
         title=""
@@ -65,7 +56,7 @@ export default function ApiKeyDialog({
                 {languageIcons.map((icon) => (
                   <div key={icon} className="h-6 w-6">
                     <img
-                      src={`assets/${icon}`}
+                      src={`/assets/${icon}`}
                       alt=""
                       className="h-full w-full object-contain opacity-[0.85] dark:invert"
                     />
@@ -104,7 +95,6 @@ export default function ApiKeyDialog({
             <Button
               onClick={onRevoke}
               className="bg-destructive text-white transition-all duration-200 hover:bg-destructive/80"
-              aria-label={localize('com_ui_revoke')}
             >
               {localize('com_ui_revoke')}
             </Button>

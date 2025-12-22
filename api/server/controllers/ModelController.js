@@ -1,11 +1,9 @@
-const { logger } = require('@librechat/data-schemas');
 const { CacheKeys } = require('librechat-data-provider');
 const { loadDefaultModels, loadConfigModels } = require('~/server/services/Config');
 const { getLogStores } = require('~/cache');
 
 /**
  * @param {ServerRequest} req
- * @returns {Promise<TModelsConfig>} The models config.
  */
 const getModelsConfig = async (req) => {
   const cache = getLogStores(CacheKeys.CONFIG_STORE);
@@ -38,13 +36,8 @@ async function loadModels(req) {
 }
 
 async function modelController(req, res) {
-  try {
-    const modelConfig = await loadModels(req);
-    res.send(modelConfig);
-  } catch (error) {
-    logger.error('Error fetching models:', error);
-    res.status(500).send({ error: error.message });
-  }
+  const modelConfig = await loadModels(req);
+  res.send(modelConfig);
 }
 
 module.exports = { modelController, loadModels, getModelsConfig };
